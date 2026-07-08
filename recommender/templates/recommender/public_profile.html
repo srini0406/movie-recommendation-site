@@ -1,0 +1,74 @@
+{% extends 'recommender/base.html' %}
+{% block title %}{{ profile_user.username }} | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page">
+    <!-- Header -->
+    <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+        <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:1.75rem;font-weight:700;flex-shrink:0">{{ profile_user.username|first|upper }}</div>
+        <div style="flex:1;min-width:0">
+            <h1 style="font-size:1.4rem;font-weight:700">{{ profile_user.username }}</h1>
+            {% if profile_user.profile.bio %}
+            <p style="color:var(--text-muted);font-size:.9rem;margin-top:.3rem">{{ profile_user.profile.bio }}</p>
+            {% endif %}
+            {% if profile_user.profile.favorite_genres %}
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem">
+                {% for g in profile_user.profile.favorite_genres %}<span class="badge badge-primary">{{ g }}</span>{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div style="display:flex;gap:1.5rem;text-align:center">
+            <div><div style="font-size:1.5rem;font-weight:700;color:var(--primary)">{{ reviews.count }}</div><div style="font-size:.8rem;color:var(--text-muted)">Reviews</div></div>
+            <div><div style="font-size:1.5rem;font-weight:700;color:var(--secondary)">{{ ratings.count }}</div><div style="font-size:.8rem;color:var(--text-muted)">Ratings</div></div>
+            <div><div style="font-size:1.5rem;font-weight:700;color:var(--success)">{{ public_lists.count }}</div><div style="font-size:.8rem;color:var(--text-muted)">Lists</div></div>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+
+        <!-- Recent reviews -->
+        <div>
+            <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">Recent Reviews</h2>
+            {% if reviews %}
+            <div style="display:flex;flex-direction:column;gap:.75rem">
+                {% for r in reviews %}
+                <div class="card" style="padding:1rem">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
+                        <a href="{% url 'recommender:movie_reviews' r.movie_title %}" style="font-weight:600;font-size:.9rem;color:var(--text);text-decoration:none" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text)'">{{ r.movie_title }}</a>
+                        {% if r.score %}<span style="background:rgba(251,191,36,.15);color:#fbbf24;padding:.15rem .5rem;border-radius:50px;font-size:.78rem;font-weight:700">★ {{ r.score }}/10</span>{% endif %}
+                    </div>
+                    <p style="color:var(--text-muted);font-size:.875rem;line-height:1.6">{{ r.body|truncatechars:140 }}</p>
+                    <p style="color:var(--text-muted);font-size:.75rem;margin-top:.4rem">{{ r.created_at|date:"M d, Y" }} · ❤ {{ r.like_count }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" style="padding:2rem"><p>No reviews yet.</p></div>
+            {% endif %}
+        </div>
+
+        <!-- Public lists -->
+        <div>
+            <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">Public Lists</h2>
+            {% if public_lists %}
+            <div style="display:flex;flex-direction:column;gap:.75rem">
+                {% for ml in public_lists %}
+                <a href="{% url 'recommender:list_detail' ml.slug %}" style="text-decoration:none;color:inherit">
+                    <div class="card" style="padding:1rem;transition:var(--transition)" onmouseover="this.style.borderColor='rgba(99,102,241,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+                            <span style="font-weight:600;font-size:.9rem">{{ ml.title }}</span>
+                            <span class="badge badge-primary">{{ ml.item_count }} film{{ ml.item_count|pluralize }}</span>
+                        </div>
+                        {% if ml.description %}<p style="color:var(--text-muted);font-size:.82rem;margin-top:.3rem">{{ ml.description|truncatechars:80 }}</p>{% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" style="padding:2rem"><p>No public lists yet.</p></div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}

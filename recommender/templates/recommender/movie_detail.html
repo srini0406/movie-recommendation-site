@@ -1,0 +1,161 @@
+{% extends 'recommender/base.html' %}
+{% block title %}{{ movie.title }} | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    .detail-hero{display:grid;grid-template-columns:220px 1fr;gap:2.5rem;align-items:start}
+    .detail-poster{width:220px;border-radius:var(--radius);overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5);flex-shrink:0}
+    .detail-poster img{width:100%;display:block}
+    .poster-placeholder{width:220px;height:330px;background:var(--surface-light);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:4rem}
+    .detail-title{font-size:clamp(1.5rem,4vw,2.25rem);font-weight:700;line-height:1.2;margin-bottom:.5rem}
+    .detail-meta{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem}
+    .meta-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .75rem;background:var(--surface-light);border-radius:50px;font-size:.85rem;color:var(--text-muted)}
+    .genre-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.25rem}
+    .genre-tag{padding:.25rem .7rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:50px;font-size:.82rem;color:#a5b4fc;text-decoration:none;transition:var(--transition)}
+    .genre-tag:hover{background:rgba(99,102,241,.3);color:#fff}
+    .overview{font-size:.97rem;line-height:1.8;color:var(--text-muted);margin-bottom:1.5rem}
+    .action-row{display:flex;gap:.75rem;flex-wrap:wrap}
+    .star-filled{color:#fbbf24;font-size:1.1rem}
+    .star-empty{color:var(--surface-light);font-size:1.1rem}
+    .btn-stream{background:rgba(255,197,0,.12);border:1.5px solid rgba(255,197,0,.3);color:#ffd700}
+    .btn-stream:hover{background:rgba(255,197,0,.22);border-color:#ffd700;color:#ffd700}
+    @media(max-width:640px){
+        .detail-hero{grid-template-columns:1fr}
+        .detail-poster,.poster-placeholder{width:100%;max-width:240px;margin:0 auto}
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="card" style="margin-bottom:1.5rem">
+        <div class="detail-hero">
+            <!-- Poster -->
+            <div>
+                {% if movie.poster_url %}
+                <div class="detail-poster">
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster" loading="lazy">
+                </div>
+                {% else %}
+                <div class="poster-placeholder">🎬</div>
+                {% endif %}
+            </div>
+
+            <!-- Info -->
+            <div>
+                <h1 class="detail-title">{{ movie.title }}</h1>
+
+                <div class="detail-meta">
+                    <span class="meta-chip">⭐ {{ movie.rating }}/10</span>
+                    <span class="meta-chip">🗳 {{ movie.votes }} votes</span>
+                    <span class="meta-chip">📅 {{ movie.release_date }}</span>
+                    <span class="meta-chip">📈 {{ movie.popularity }} popularity</span>
+                    <span class="meta-chip">🏢 {{ movie.production }}</span>
+                </div>
+
+                {% if movie.genres %}
+                <div class="genre-tags">
+                    {% for g in movie.genres %}
+                    <a href="{% url 'recommender:genre_browse' %}?genre={{ g|lower }}" class="genre-tag">{{ g|capfirst }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if movie.overview %}
+                <p class="overview">{{ movie.overview }}</p>
+                {% endif %}
+
+                <div class="action-row">
+                    <form method="POST" action="{% url 'recommender:main' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="movie_name" value="{{ movie.title }}">
+                        <button type="submit" class="btn btn-primary">🎬 Get Recommendations</button>
+                    </form>
+
+                    <a href="{% url 'recommender:movie_reviews' movie.title %}" class="btn btn-outline">💬 Reviews</a>
+
+                    {% if movie.imdb_link %}
+                    <a href="{{ movie.imdb_link }}" target="_blank" rel="noopener" class="btn btn-outline">⭐ IMDb</a>
+                    {% endif %}
+
+                    <a href="{{ movie.google_link }}" target="_blank" rel="noopener" class="btn btn-outline">🔍 Google</a>
+
+                    <a href="https://www.justwatch.com/us/search?q={{ movie.title|urlencode }}" target="_blank" rel="noopener" class="btn btn-stream">▶ Where to Stream</a>
+
+                    {% if user.is_authenticated %}
+                    <button class="btn btn-outline" id="wlBtn"
+                        data-title="{{ movie.title|escapejs }}"
+                        data-imdb="{{ movie.imdb_id|default:'' }}"
+                        data-poster="{{ movie.poster_url|default:'' }}"
+                        data-genres="{{ movie.genres|join:', ' }}"
+                        data-rating="{{ movie.rating }}"
+                        data-in="{{ movie.in_watchlist|yesno:'1,0' }}"
+                        onclick="toggleWatchlist(this)">
+                        {% if movie.in_watchlist %}✓ In Watchlist{% else %}+ Watchlist{% endif %}
+                    </button>
+                    {% endif %}
+                </div>
+
+                {% if user.is_authenticated %}
+                <div style="margin-top:1.5rem">
+                    <p style="font-size:.9rem;color:var(--text-muted);margin-bottom:.6rem;font-weight:600">Your rating</p>
+                    <div style="display:flex;gap:.25rem" id="starDisplay">
+                        {% for i in "12345678910" %}
+                        <span class="{% if movie.user_rating and forloop.counter <= movie.user_rating %}star-filled{% else %}star-empty{% endif %}"
+                            style="cursor:pointer;font-size:1.4rem"
+                            data-val="{{ forloop.counter }}"
+                            onclick="quickRate({{ forloop.counter }}, '{{ movie.title|escapejs }}')">★</span>
+                        {% endfor %}
+                    </div>
+                    <p style="font-size:.8rem;color:var(--text-muted);margin-top:.35rem" id="rateMsg">
+                        {% if movie.user_rating %}Rated {{ movie.user_rating }}/10{% else %}Click to rate{% endif %}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:.75rem">
+        <a href="javascript:history.back()" class="btn btn-outline btn-sm">← Back</a>
+        <a href="{% url 'recommender:main' %}" class="btn btn-outline btn-sm">🏠 Home</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function toggleWatchlist(btn) {
+    const inList = btn.dataset.in === '1';
+    const url = inList ? '{% url "recommender:watchlist_remove" %}' : '{% url "recommender:watchlist_add" %}';
+    const body = new URLSearchParams({
+        movie_title: btn.dataset.title,
+        imdb_id: btn.dataset.imdb,
+        poster_url: btn.dataset.poster,
+        genres: btn.dataset.genres,
+        rating: btn.dataset.rating,
+    });
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':CSRF}, body})
+        .then(r => r.json())
+        .then(() => {
+            if (inList) { btn.dataset.in='0'; btn.textContent='+ Watchlist'; }
+            else { btn.dataset.in='1'; btn.textContent='✓ In Watchlist'; }
+        });
+}
+
+function quickRate(score, title) {
+    const stars = document.querySelectorAll('#starDisplay span');
+    stars.forEach(s => {
+        s.className = +s.dataset.val <= score ? 'star-filled' : 'star-empty';
+        s.style.cursor = 'pointer'; s.style.fontSize = '1.4rem';
+    });
+    document.getElementById('rateMsg').textContent = 'Saving...';
+    const body = new URLSearchParams({movie_title: title, score, review: ''});
+    fetch('{% url "recommender:rate_movie" %}', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':CSRF}, body})
+        .then(r => r.json())
+        .then(() => { document.getElementById('rateMsg').textContent = 'Rated ' + score + '/10'; });
+}
+</script>
+{% endblock %}

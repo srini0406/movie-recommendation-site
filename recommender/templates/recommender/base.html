@@ -1,0 +1,177 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="{% static 'logo.ico' %}">
+    <title>{% block title %}Movie Recommendation System{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --primary:#6366f1;--primary-dark:#4f46e5;--secondary:#8b5cf6;
+            --bg:#0f172a;--surface:#1e293b;--surface-light:#334155;
+            --text:#f1f5f9;--text-muted:#cbd5e1;--error:#ef4444;--success:#10b981;
+            --radius:12px;--transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+        /* ── Light mode ── */
+        [data-theme="light"]{
+            --bg:#f1f5f9;--surface:#ffffff;--surface-light:#e2e8f0;
+            --text:#0f172a;--text-muted:#64748b;
+        }
+        [data-theme="light"] body{background:linear-gradient(135deg,#f1f5f9 0%,#e2e8f0 100%)}
+        [data-theme="light"] .nav{background:#fff;border-bottom-color:rgba(0,0,0,.08)}
+        [data-theme="light"] .card{box-shadow:0 2px 16px rgba(0,0,0,.08)}
+        [data-theme="light"] .form-input{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+        [data-theme="light"] .form-input::placeholder{color:#94a3b8}
+
+        body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,var(--bg) 0%,#1a1f3a 100%);color:var(--text);min-height:100vh;line-height:1.6;transition:background .3s,color .3s}
+
+        /* Nav */
+        .nav{background:var(--surface);border-bottom:1px solid rgba(255,255,255,.08);padding:.9rem 2rem;position:sticky;top:0;z-index:200;backdrop-filter:blur(10px);transition:background .3s}
+        .nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+        .nav-brand{font-weight:700;font-size:1.1rem;text-decoration:none;color:var(--text);background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .nav-links{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+        .nav-link{padding:.45rem .9rem;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:.9rem;font-weight:500;transition:var(--transition)}
+        .nav-link:hover,.nav-link.active{background:rgba(99,102,241,.15);color:var(--primary)}
+        .nav-btn{padding:.45rem .9rem;border-radius:8px;text-decoration:none;font-size:.9rem;font-weight:600;transition:var(--transition);border:none;cursor:pointer;font-family:inherit}
+        .nav-btn-outline{background:transparent;border:1.5px solid var(--surface-light);color:var(--text-muted)}
+        .nav-btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+        .nav-btn-primary{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff}
+        .nav-btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+        .nav-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0}
+
+        /* Theme toggle */
+        .theme-toggle{background:transparent;border:1.5px solid var(--surface-light);border-radius:8px;padding:.4rem .7rem;cursor:pointer;font-size:1rem;transition:var(--transition);color:var(--text-muted);line-height:1}
+        .theme-toggle:hover{border-color:var(--primary)}
+
+        /* Messages */
+        .messages{max-width:1200px;margin:1rem auto 0;padding:0 1rem}
+        .msg{padding:.85rem 1.25rem;border-radius:var(--radius);margin-bottom:.5rem;border-left:4px solid;font-size:.9rem}
+        .msg-success{background:rgba(16,185,129,.1);border-color:var(--success);color:#6ee7b7}
+        .msg-error{background:rgba(239,68,68,.1);border-color:var(--error);color:#fca5a5}
+        .msg-info{background:rgba(99,102,241,.1);border-color:var(--primary);color:#a5b4fc}
+
+        /* Page wrapper */
+        .page{max-width:1200px;margin:0 auto;padding:2rem 1rem 4rem}
+
+        /* Card */
+        .card{background:var(--surface);border-radius:var(--radius);padding:2rem;border:1px solid rgba(255,255,255,.07);box-shadow:0 8px 32px rgba(0,0,0,.25)}
+
+        /* Form */
+        .form-group{margin-bottom:1.25rem}
+        .form-label{display:block;font-size:.9rem;font-weight:600;margin-bottom:.5rem;color:var(--text)}
+        .form-input{width:100%;padding:.85rem 1rem;font-size:.95rem;border:2px solid var(--surface-light);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit;transition:var(--transition)}
+        .form-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+        .form-input::placeholder{color:var(--text-muted);opacity:.7}
+        textarea.form-input{resize:vertical;min-height:100px}
+        .form-hint{font-size:.8rem;color:var(--text-muted);margin-top:.35rem}
+        .form-error{font-size:.82rem;color:#fca5a5;margin-top:.35rem}
+
+        /* Skeleton loader */
+        .skeleton{background:linear-gradient(90deg,var(--surface) 25%,var(--surface-light) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius)}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .skeleton-card{height:280px;border-radius:var(--radius);margin-bottom:1rem}
+        .skeleton-text{height:14px;border-radius:4px;margin-bottom:.5rem}
+        .skeleton-text.short{width:60%}
+
+        /* Buttons */
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;padding:.75rem 1.5rem;border-radius:var(--radius);font-size:.95rem;font-weight:600;cursor:pointer;transition:var(--transition);border:none;font-family:inherit;text-decoration:none}
+        .btn-primary{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.3)}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(99,102,241,.4)}
+        .btn-outline{background:transparent;border:1.5px solid var(--surface-light);color:var(--text-muted)}
+        .btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+        .btn-danger{background:rgba(239,68,68,.15);border:1.5px solid var(--error);color:#fca5a5}
+        .btn-danger:hover{background:rgba(239,68,68,.25)}
+        .btn-sm{padding:.45rem .9rem;font-size:.85rem}
+        .btn-full{width:100%}
+
+        /* Badge */
+        .badge{display:inline-block;padding:.2rem .6rem;border-radius:50px;font-size:.78rem;font-weight:600}
+        .badge-primary{background:rgba(99,102,241,.2);color:#a5b4fc}
+        .badge-success{background:rgba(16,185,129,.2);color:#6ee7b7}
+
+        /* Empty state */
+        .empty{text-align:center;padding:4rem 2rem;color:var(--text-muted)}
+        .empty-icon{font-size:3.5rem;margin-bottom:1rem}
+
+        /* Responsive */
+        @media(max-width:640px){
+            .nav{padding:.75rem 1rem}
+            .page{padding:1.5rem .75rem 3rem}
+            .card{padding:1.25rem}
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="{% url 'recommender:main' %}" class="nav-brand">🎬 MovieRec</a>
+        <div class="nav-links">
+            <a href="{% url 'recommender:main' %}" class="nav-link">Home</a>
+            <a href="{% url 'recommender:trending' %}" class="nav-link">🔥 Trending</a>
+            <a href="{% url 'recommender:genre_browse' %}" class="nav-link">🎭 Genres</a>
+            <a href="{% url 'recommender:mood_recommendations' %}" class="nav-link">😊 Mood</a>
+            <a href="{% url 'recommender:surprise_me' %}" class="nav-link">🎲 Surprise Me</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'recommender:watchlist' %}" class="nav-link">Watchlist</a>
+                <a href="{% url 'recommender:my_lists' %}" class="nav-link">📋 Lists</a>
+                <a href="{% url 'recommender:my_ratings' %}" class="nav-link">My Ratings</a>
+                <a href="{% url 'recommender:leaderboard' %}" class="nav-link">🏆 Leaderboard</a>
+                {% if user.is_staff %}<a href="{% url 'recommender:analytics_dashboard' %}" class="nav-link">📊 Analytics</a>{% endif %}
+                <a href="{% url 'recommender:profile' %}" class="nav-link">
+                    <span class="nav-avatar">{{ user.username|first|upper }}</span>
+                    {{ user.username }}
+                </a>
+                <form method="post" action="{% url 'recommender:logout' %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-btn nav-btn-outline">Logout</button>
+                </form>
+            {% else %}
+                <a href="{% url 'recommender:leaderboard' %}" class="nav-link">🏆 Leaderboard</a>
+                <a href="{% url 'recommender:login' %}" class="nav-btn nav-btn-outline">Login</a>
+                <a href="{% url 'recommender:register' %}" class="nav-btn nav-btn-primary">Sign Up</a>
+            {% endif %}
+            <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">🌙</button>
+        </div>
+    </div>
+</nav>
+
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+    <div class="msg msg-{{ message.tags|default:'info' }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+{% block extra_scripts %}{% endblock %}
+
+<script>
+// ── Dark / Light mode ──
+(function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = saved === 'dark' ? '🌙' : '☀️';
+})();
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        btn.textContent = next === 'dark' ? '🌙' : '☀️';
+    });
+});
+</script>
+</body>
+</html>

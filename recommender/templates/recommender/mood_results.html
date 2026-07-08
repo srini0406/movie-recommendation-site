@@ -1,0 +1,68 @@
+{% extends 'recommender/base.html' %}
+{% block title %}{{ mood.label }} Movies | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    .mood-pills{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.75rem}
+    .mood-pill{padding:.4rem 1rem;border-radius:50px;text-decoration:none;font-size:.85rem;font-weight:500;border:1.5px solid var(--surface-light);color:var(--text-muted);transition:var(--transition)}
+    .mood-pill:hover{border-color:var(--primary);color:var(--primary)}
+    .mood-pill.active{background:var(--primary);border-color:var(--primary);color:#fff}
+    .movies-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:1rem}
+    .movie-tile{background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid rgba(255,255,255,.07);transition:var(--transition);text-decoration:none;color:var(--text);display:flex;flex-direction:column}
+    .movie-tile:hover{transform:translateY(-5px);border-color:rgba(99,102,241,.4);box-shadow:0 12px 28px rgba(99,102,241,.15)}
+    .tile-poster{width:100%;aspect-ratio:2/3;background:var(--surface-light);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden}
+    .tile-poster img{width:100%;height:100%;object-fit:cover}
+    .tile-body{padding:.8rem;flex:1;display:flex;flex-direction:column;gap:.25rem}
+    .tile-title{font-size:.88rem;font-weight:600;line-height:1.35}
+    .tile-rating{font-size:.8rem;color:#fbbf24}
+    .tile-meta{font-size:.76rem;color:var(--text-muted)}
+    .tile-overview{font-size:.75rem;color:var(--text-muted);line-height:1.4;margin-top:.2rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+    <!-- Mood header -->
+    <div style="margin-bottom:1.5rem">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
+            <span style="font-size:2.25rem">{{ mood.emoji }}</span>
+            <h1 style="font-size:1.75rem;font-weight:700">{{ mood.label }}</h1>
+        </div>
+        <p style="color:var(--text-muted);font-size:.95rem">{{ mood.desc }}</p>
+    </div>
+
+    <!-- Other mood pills -->
+    <div class="mood-pills">
+        {% for m in all_moods %}
+        <a href="{% url 'recommender:mood_results' m.key %}"
+           class="mood-pill {% if m.key == mood_key %}active{% endif %}">
+            {{ m.emoji }} {{ m.label }}
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if movies %}
+    <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:1rem">{{ movies|length }} movies matched</p>
+    <div class="movies-grid">
+        {% for m in movies %}
+        <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-tile">
+            <div class="tile-poster">
+                {% if m.poster_url %}<img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">{% else %}🎬{% endif %}
+            </div>
+            <div class="tile-body">
+                <div class="tile-title">{{ m.title }}</div>
+                <div class="tile-rating">★ {{ m.rating }} <span style="color:var(--text-muted)">({{ m.votes }})</span></div>
+                <div class="tile-meta">{{ m.year }}{% if m.genres %} · {{ m.genres }}{% endif %}</div>
+                {% if m.overview_short %}<div class="tile-overview">{{ m.overview_short }}</div>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">🎬</div>
+        <p>No movies found for this mood. Try another one.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

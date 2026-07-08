@@ -1,0 +1,66 @@
+{% extends 'recommender/base.html' %}
+{% block title %}My Watchlist | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
+        <div>
+            <h1 style="font-size:1.75rem;font-weight:700">My Watchlist</h1>
+            <p style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">{{ watchlist.count }} movie{% if watchlist.count != 1 %}s{% endif %} saved</p>
+        </div>
+        <a href="{% url 'recommender:main' %}" class="btn btn-primary btn-sm">+ Find movies</a>
+    </div>
+
+    {% if watchlist %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem">
+        {% for item in watchlist %}
+        <div class="card" style="display:flex;flex-direction:column;gap:.75rem" id="wl-{{ forloop.counter }}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem">
+                <div style="flex:1;min-width:0">
+                    <h3 style="font-size:1rem;font-weight:600;line-height:1.4">{{ item.movie_title }}</h3>
+                    {% if item.genres %}<p style="color:var(--text-muted);font-size:.85rem;margin-top:.2rem">{{ item.genres }}</p>{% endif %}
+                    {% if item.rating %}<p style="font-size:.85rem;margin-top:.2rem">⭐ {{ item.rating }}</p>{% endif %}
+                </div>
+                <span style="font-size:1.5rem">🎬</span>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                {% if item.imdb_id %}
+                <a href="https://www.imdb.com/title/{{ item.imdb_id }}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">IMDb</a>
+                {% endif %}
+                <a href="https://www.google.com/search?q={{ item.movie_title|urlencode }}+movie" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Google</a>
+                <button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('{{ item.movie_title|escapejs }}', 'wl-{{ forloop.counter }}')">Remove</button>
+            </div>
+            <p style="color:var(--text-muted);font-size:.78rem">Added {{ item.added_at|date:"M d, Y" }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">📋</div>
+        <h2 style="font-size:1.25rem;font-weight:600;margin-bottom:.5rem">Your watchlist is empty</h2>
+        <p>Search for movies and click "Save to Watchlist" to add them here.</p>
+        <a href="{% url 'recommender:main' %}" class="btn btn-primary" style="margin-top:1.5rem">Discover movies</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function removeFromWatchlist(title, cardId) {
+    const csrfToken = '{{ csrf_token }}';
+    fetch('{% url "recommender:watchlist_remove" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken},
+        body: 'movie_title=' + encodeURIComponent(title)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.removed) {
+            const card = document.getElementById(cardId);
+            if (card) card.remove();
+        }
+    });
+}
+</script>
+{% endblock %}

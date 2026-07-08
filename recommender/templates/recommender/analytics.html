@@ -1,0 +1,335 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Analytics Dashboard | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Global Dashboard Layout Overrides */
+    .dashboard-page {
+        padding: 1.5rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .dashboard-header {
+        margin-bottom: 2.5rem;
+    }
+
+    .dashboard-title {
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .dashboard-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-top: 0.35rem;
+    }
+
+    /* KPI Metrics Grid */
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2.5rem;
+    }
+
+    .stat-card {
+        background: var(--surface);
+        border-radius: calc(var(--radius) * 1.2);
+        padding: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .stat-value {
+        font-size: 2.25rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-top: 0.6rem;
+    }
+
+    /* Data Visualization Tables/Cards */
+    .table-card {
+        background: var(--surface);
+        border-radius: calc(var(--radius) * 1.2);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .table-header {
+        padding: 1.25rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background: rgba(255, 255, 255, 0.01);
+    }
+
+    .table-row {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        gap: 1rem;
+        transition: background-color 0.15s ease;
+    }
+
+    .table-row:last-child {
+        border-bottom: none;
+    }
+
+    .table-row:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .rank {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+
+    .movie-title-span {
+        flex: 1;
+        font-size: 0.9rem;
+        font-weight: 500;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bar-wrap {
+        height: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+        flex: 1;
+        min-width: 80px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        border-radius: 4px;
+        transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .count-badge {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.03);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        flex-shrink: 0;
+    }
+
+    .rating-badge {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #fbbf24;
+        background: rgba(251, 191, 36, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        flex-shrink: 0;
+    }
+
+    /* User Profile List styling */
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #fff;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .user-profile-link {
+        flex: 1;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--text);
+        text-decoration: none;
+        transition: color 0.15s ease;
+    }
+
+    .user-profile-link:hover {
+        color: var(--primary);
+    }
+
+    .date-span {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .empty-state {
+        padding: 2rem 1.5rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    /* Column Layout */
+    .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.75rem;
+    }
+
+    @media (max-width: 992px) {
+        .two-col {
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">📊 Analytics Dashboard</h1>
+        <p class="dashboard-subtitle">Staff-only overview of site activity</p>
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">{{ total_users }}</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-value">{{ new_users_week }}</div><div class="stat-label">New This Week</div></div>
+        <div class="stat-card"><div class="stat-value">{{ new_users_month }}</div><div class="stat-label">New This Month</div></div>
+        <div class="stat-card"><div class="stat-value">{{ total_reviews }}</div><div class="stat-label">Total Reviews</div></div>
+        <div class="stat-card"><div class="stat-value">{{ total_ratings }}</div><div class="stat-label">Total Ratings</div></div>
+        <div class="stat-card"><div class="stat-value">{{ total_watchlist }}</div><div class="stat-label">Watchlist Items</div></div>
+        <div class="stat-card"><div class="stat-value">{{ total_lists }}</div><div class="stat-label">Movie Lists</div></div>
+    </div>
+
+    <div class="two-col">
+        <div>
+            <div class="table-card">
+                <div class="table-header">🔍 Most Searched Movies</div>
+                {% if most_searched %}
+                    {% for item in most_searched %}
+                    <div class="table-row">
+                        <span class="rank">{{ forloop.counter }}</span>
+                        <span class="movie-title-span" title="{{ item.movie_title }}">{{ item.movie_title }}</span>
+                        <div class="bar-wrap">
+                            <div class="bar-fill" style="width:{% widthratio item.count most_searched.0.count 100 %}%"></div>
+                        </div>
+                        <span class="count-badge">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No data available yet.</div>
+                {% endif %}
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">💬 Most Reviewed Movies</div>
+                {% if most_reviewed %}
+                    {% for item in most_reviewed %}
+                    <div class="table-row">
+                        <span class="rank">{{ forloop.counter }}</span>
+                        <span class="movie-title-span" title="{{ item.movie_title }}">{{ item.movie_title }}</span>
+                        <div class="bar-wrap">
+                            <div class="bar-fill" style="width:{% widthratio item.count most_reviewed.0.count 100 %}%"></div>
+                        </div>
+                        <span class="count-badge">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No data available yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <div class="table-card">
+                <div class="table-header">⭐ Most Rated Movies</div>
+                {% if most_rated %}
+                    {% for item in most_rated %}
+                    <div class="table-row">
+                        <span class="rank">{{ forloop.counter }}</span>
+                        <span class="movie-title-span" title="{{ item.movie_title }}">{{ item.movie_title }}</span>
+                        {% if item.avg %}
+                            <span class="rating-badge">★ {{ item.avg|floatformat:1 }}</span>
+                        {% endif %}
+                        <div class="bar-wrap">
+                            <div class="bar-fill" style="width:{% widthratio item.count most_rated.0.count 100 %}%"></div>
+                        </div>
+                        <span class="count-badge">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No data available yet.</div>
+                {% endif %}
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">👤 Recent Sign-ups</div>
+                {% for u in recent_users %}
+                <div class="table-row">
+                    <div class="user-avatar">
+                        {{ u.username|first|upper }}
+                    </div>
+                    <a href="{% url 'recommender:public_profile' u.username %}" class="user-profile-link">
+                        {{ u.username }}
+                    </a>
+                    <span class="date-span">{{ u.date_joined|date:"M d, Y" }}</span>
+                </div>
+                {% empty %}
+                <div class="empty-state">No users registered yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

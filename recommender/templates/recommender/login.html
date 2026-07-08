@@ -1,0 +1,43 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Login | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:480px">
+    <div class="card" style="margin-top:2rem">
+        <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.25rem">Welcome back</h1>
+        <p style="color:var(--text-muted);margin-bottom:1.75rem;font-size:.95rem">Log in to your account.</p>
+
+        <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="form-group">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <input
+                    class="form-input"
+                    type="{{ field.field.widget.input_type }}"
+                    name="{{ field.html_name }}"
+                    id="{{ field.id_for_label }}"
+                    {% if field.value %}value="{{ field.value }}"{% endif %}
+                    autocomplete="{{ field.html_name }}"
+                >
+                {% for error in field.errors %}
+                <p class="form-error">⚠ {{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% if form.non_field_errors %}
+            <div style="margin-bottom:1rem">
+                {% for error in form.non_field_errors %}
+                <p class="form-error">⚠ {{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-full">Log in</button>
+        </form>
+
+        <p style="text-align:center;margin-top:1.5rem;font-size:.9rem;color:var(--text-muted)">
+            No account? <a href="{% url 'recommender:register' %}" style="color:var(--primary);text-decoration:none;font-weight:600">Sign up free</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Edit Profile | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:560px">
+    <div class="card" style="margin-top:1.5rem">
+        <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:1.5rem">Edit Profile</h1>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Bio</label>
+                <textarea name="bio" class="form-input" placeholder="Tell us a bit about yourself..." maxlength="500">{{ profile.bio }}</textarea>
+                <p class="form-hint">Max 500 characters.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Favorite genres</label>
+                <input type="text" name="favorite_genres" class="form-input"
+                    value="{{ profile.favorite_genres|join:', ' }}"
+                    placeholder="Action, Drama, Sci-Fi">
+                <p class="form-hint">Comma-separated list.</p>
+            </div>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem">
+                <button type="submit" class="btn btn-primary">Save changes</button>
+                <a href="{% url 'recommender:profile' %}" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

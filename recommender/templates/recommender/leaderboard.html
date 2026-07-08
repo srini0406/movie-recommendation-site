@@ -1,0 +1,61 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Leaderboard | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div style="margin-bottom:1.5rem">
+        <h1 style="font-size:1.75rem;font-weight:700">🏆 Leaderboard</h1>
+        <p style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">Top reviewers and most-discussed movies</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+
+        <!-- Top reviewers -->
+        <div>
+            <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">📝 Top Reviewers</h2>
+            {% if top_reviewers %}
+            <div style="display:flex;flex-direction:column;gap:.6rem">
+                {% for u in top_reviewers %}
+                <div class="card" style="padding:1rem;display:flex;align-items:center;gap:.85rem">
+                    <div style="width:32px;text-align:center;font-size:.85rem;font-weight:700;color:var(--text-muted);flex-shrink:0">
+                        {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
+                    </div>
+                    <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0">{{ u.username|first|upper }}</div>
+                    <div style="flex:1;min-width:0">
+                        <a href="{% url 'recommender:public_profile' u.username %}" style="font-weight:600;font-size:.9rem;color:var(--text);text-decoration:none;transition:var(--transition)" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text)'">{{ u.username }}</a>
+                        <p style="color:var(--text-muted);font-size:.78rem;margin-top:.1rem">{{ u.review_count }} review{{ u.review_count|pluralize }}{% if u.avg_score %} · avg ★ {{ u.avg_score|floatformat:1 }}{% endif %}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" style="padding:2rem"><p>No reviews yet.</p></div>
+            {% endif %}
+        </div>
+
+        <!-- Most reviewed movies -->
+        <div>
+            <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">🎬 Most Reviewed Movies</h2>
+            {% if top_movies %}
+            <div style="display:flex;flex-direction:column;gap:.6rem">
+                {% for m in top_movies %}
+                <div class="card" style="padding:1rem;display:flex;align-items:center;gap:.85rem">
+                    <div style="width:28px;text-align:center;font-size:.85rem;font-weight:700;color:var(--text-muted);flex-shrink:0">{{ forloop.counter }}</div>
+                    <div style="flex:1;min-width:0">
+                        <a href="{% url 'recommender:movie_reviews' m.movie_title %}" style="font-weight:600;font-size:.9rem;color:var(--text);text-decoration:none;transition:var(--transition)" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text)'">{{ m.movie_title }}</a>
+                        <p style="color:var(--text-muted);font-size:.78rem;margin-top:.1rem">
+                            {{ m.count }} review{{ m.count|pluralize }}{% if m.avg %} · avg ★ {{ m.avg|floatformat:1 }}{% endif %}
+                        </p>
+                    </div>
+                    <a href="{% url 'recommender:movie_reviews' m.movie_title %}" class="btn btn-outline btn-sm">Read</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" style="padding:2rem"><p>No reviewed movies yet.</p></div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}

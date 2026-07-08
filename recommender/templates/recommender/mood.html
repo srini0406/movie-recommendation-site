@@ -1,0 +1,36 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Mood-Based Recommendations | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    .mood-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.25rem}
+    .mood-card{text-decoration:none;color:var(--text);background:var(--surface);border-radius:var(--radius);padding:1.75rem 1.5rem;border:1px solid rgba(255,255,255,.07);transition:var(--transition);display:flex;flex-direction:column;gap:.6rem;position:relative;overflow:hidden}
+    .mood-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--primary),var(--secondary));opacity:0;transition:opacity .3s}
+    .mood-card:hover{transform:translateY(-5px);box-shadow:0 14px 36px rgba(99,102,241,.2);border-color:rgba(99,102,241,.4)}
+    .mood-card:hover::before{opacity:.06}
+    .mood-emoji{font-size:2.5rem;line-height:1}
+    .mood-label{font-size:1.05rem;font-weight:700}
+    .mood-desc{font-size:.875rem;color:var(--text-muted);line-height:1.5}
+    .mood-cta{margin-top:auto;font-size:.82rem;color:var(--primary);font-weight:600}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div style="text-align:center;margin-bottom:2.5rem">
+        <h1 style="font-size:2rem;font-weight:700;margin-bottom:.5rem">🎭 What's your mood?</h1>
+        <p style="color:var(--text-muted);font-size:1rem">Pick a mood and we'll find the perfect movies for it.</p>
+    </div>
+
+    <div class="mood-grid">
+        {% for mood in moods %}
+        <a href="{% url 'recommender:mood_results' mood.key %}" class="mood-card">
+            <div class="mood-emoji">{{ mood.emoji }}</div>
+            <div class="mood-label">{{ mood.label }}</div>
+            <div class="mood-desc">{{ mood.desc }}</div>
+            <div class="mood-cta">Explore →</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Profile | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page">
+    <!-- Profile header -->
+    <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+        <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;flex-shrink:0">
+            {{ user.username|first|upper }}
+        </div>
+        <div style="flex:1;min-width:0">
+            <h1 style="font-size:1.5rem;font-weight:700">{{ user.username }}</h1>
+            <p style="color:var(--text-muted);font-size:.9rem">{{ user.email }}</p>
+            {% if user.profile.bio %}
+            <p style="margin-top:.5rem;font-size:.9rem">{{ user.profile.bio }}</p>
+            {% endif %}
+            {% if user.profile.favorite_genres %}
+            <div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">
+                {% for g in user.profile.favorite_genres %}
+                <span class="badge badge-primary">{{ g }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <a href="{% url 'recommender:edit_profile' %}" class="btn btn-outline btn-sm">Edit profile</a>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem">
+        <div class="card" style="text-align:center;padding:1.25rem">
+            <div style="font-size:2rem;font-weight:700;color:var(--primary)">{{ watchlist.count }}</div>
+            <div style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">Watchlist</div>
+        </div>
+        <div class="card" style="text-align:center;padding:1.25rem">
+            <div style="font-size:2rem;font-weight:700;color:var(--secondary)">{{ ratings.count }}</div>
+            <div style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">Ratings</div>
+        </div>
+        <div class="card" style="text-align:center;padding:1.25rem">
+            <div style="font-size:2rem;font-weight:700;color:var(--success)">{{ history.count }}</div>
+            <div style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">Searched</div>
+        </div>
+    </div>
+
+    <!-- Recent history -->
+    <div class="card" style="margin-bottom:1.5rem">
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">Recently searched</h2>
+        {% if history %}
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+            {% for item in history %}
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:var(--bg);border-radius:8px;flex-wrap:wrap;gap:.5rem">
+                <div>
+                    <span style="font-weight:600">{{ item.movie_title }}</span>
+                    {% if item.genres %}<span style="color:var(--text-muted);font-size:.85rem;margin-left:.5rem">{{ item.genres }}</span>{% endif %}
+                </div>
+                <span style="color:var(--text-muted);font-size:.8rem">{{ item.watched_at|date:"M d, Y" }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted);font-size:.9rem">No search history yet. Start looking up movies!</p>
+        {% endif %}
+    </div>
+
+    <!-- Quick links -->
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <a href="{% url 'recommender:watchlist' %}" class="btn btn-outline">📋 My Watchlist</a>
+        <a href="{% url 'recommender:my_ratings' %}" class="btn btn-outline">⭐ My Ratings</a>
+    </div>
+</div>
+{% endblock %}

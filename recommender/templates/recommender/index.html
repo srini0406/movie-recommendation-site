@@ -1,0 +1,601 @@
+{% extends 'recommender/base.html' %}
+{% load static %}
+
+{% block title %}Movie Recommendation System - Find Your Next Favorite Film{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="Discover your next favorite movie with our AI-powered recommendation system.">
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<style>
+    :root {
+        --primary-color: var(--primary);
+        --secondary-color: var(--secondary);
+        --background: var(--bg);
+        --surface-light: #334155;
+        --text-primary: var(--text);
+        --text-secondary: var(--text-muted);
+        --border-radius: var(--radius);
+        --transition: var(--transition);
+    }
+    
+    /* Background matrix style */
+    .background-animation {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        opacity: .05;
+    }
+    .background-animation::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, var(--primary) 1px, transparent 1px);
+        background-size: 50px 50px;
+        animation: bgMove 20s linear infinite;
+    }
+    @keyframes bgMove {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(50px, 50px); }
+    }
+    
+    /* Typography and Headers */
+    .page-header {
+        padding: 4rem 1rem 2rem;
+        text-align: center;
+    }
+    .page-header h1 {
+        font-size: clamp(2.25rem, 6vw, 3.5rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: .75rem;
+    }
+    .subtitle {
+        color: var(--text-muted);
+        font-size: 1.15rem;
+        font-weight: 400;
+    }
+    
+    /* Global Elements */
+    .stats-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: var(--surface);
+        padding: .5rem 1.25rem;
+        border-radius: 50px;
+        margin-top: 1rem;
+        font-size: .85rem;
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .stats-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: .4; transform: scale(0.9); }
+    }
+    
+    /* Search Card Components */
+    .search-card {
+        background: var(--surface);
+        border-radius: calc(var(--radius) * 1.5);
+        padding: 2.5rem;
+        border: 1px solid rgba(255, 255, 255, .07);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, .4);
+        margin-bottom: 3rem;
+    }
+    .search-input-label {
+        display: block;
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text);
+    }
+    .search-input {
+        width: 100%;
+        padding: 1.1rem 1.4rem;
+        font-size: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius);
+        background: rgba(0, 0, 0, 0.2);
+        color: var(--text);
+        transition: var(--transition);
+        font-family: inherit;
+        margin-bottom: 1.25rem;
+        box-sizing: border-box;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: rgba(0, 0, 0, 0.3);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, .15);
+    }
+    .search-input::placeholder {
+        color: var(--text-muted);
+        opacity: .6;
+    }
+    .search-btn {
+        width: 100%;
+        padding: 1.1rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: var(--transition);
+        font-family: inherit;
+        box-shadow: 0 4px 20px rgba(99, 102, 241, .3);
+    }
+    .search-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(99, 102, 241, .45);
+    }
+    .search-btn:active {
+        transform: translateY(0);
+    }
+    
+    .surprise-link {
+        color: var(--text-muted);
+        font-size: .88rem;
+        text-decoration: none;
+        transition: var(--transition);
+    }
+    .surprise-link:hover {
+        color: var(--primary);
+    }
+    
+    .alert {
+        padding: 1rem 1.25rem;
+        border-radius: var(--radius);
+        margin-top: 1.25rem;
+        border-left: 4px solid var(--error);
+        background: rgba(239, 68, 68, .1);
+        color: #fca5a5;
+        font-size: .9rem;
+        font-weight: 500;
+    }
+    
+    /* Horizontal Movie Scroller UI */
+    .row-container-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+    .row-container-meta p {
+        font-size: .95rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+    .row-container-meta .section-title-active {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0;
+    }
+    .row-container-meta a {
+        font-size: .85rem;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+        transition: opacity 0.2s ease;
+    }
+    .row-container-meta a:hover {
+        opacity: 0.8;
+    }
+    
+    .movie-scroller {
+        display: flex;
+        gap: 1.25rem;
+        overflow-x: auto;
+        padding-bottom: 1rem;
+        -webkit-overflow-scrolling: touch;
+    }
+    .movie-scroller::-webkit-scrollbar {
+        height: 6px;
+    }
+    .movie-scroller::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .movie-scroller::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+    .movie-scroller::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .movie-card-link {
+        text-decoration: none;
+        color: var(--text);
+        flex-shrink: 0;
+        width: 145px;
+    }
+    
+    .movie-poster-wrap {
+        width: 145px;
+        height: 215px;
+        border-radius: calc(var(--radius) * 0.8);
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.03);
+        margin-bottom: .6rem;
+        border: 1px solid rgba(255, 255, 255, .06);
+        transition: var(--transition);
+        position: relative;
+    }
+    .movie-card-link:hover .movie-poster-wrap {
+        border-color: var(--primary);
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+    }
+    .movie-poster-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .movie-poster-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        background: var(--surface-light);
+    }
+    
+    .rating-overlay-badge {
+        position: absolute;
+        bottom: .5rem;
+        right: .5rem;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(4px);
+        border-radius: 4px;
+        padding: .2rem .45rem;
+        font-size: .72rem;
+        color: #fbbf24;
+        font-weight: 700;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .movie-card-title {
+        font-size: .85rem;
+        font-weight: 600;
+        line-height: 1.3;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .movie-card-meta {
+        font-size: .75rem;
+        color: var(--text-muted);
+        margin-top: .2rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Marketing Features Grid Layout */
+    .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        margin-top: 3.5rem;
+    }
+    .feature-card {
+        background: var(--surface);
+        padding: 1.75rem 1.5rem;
+        border-radius: var(--radius);
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, .04);
+        transition: var(--transition);
+    }
+    .feature-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--primary);
+        box-shadow: 0 12px 32px rgba(99, 102, 241, .12);
+    }
+    .feature-icon {
+        font-size: 2.25rem;
+        margin-bottom: .75rem;
+    }
+    .feature-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: .4rem;
+        letter-spacing: -0.01em;
+    }
+    .feature-desc {
+        font-size: .875rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+    }
+
+    /* Core Application Engine Interstitial Loading view */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, .99);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity .5s ease-in-out;
+    }
+    .loading-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .loading-content {
+        text-align: center;
+        padding: 2rem;
+        max-width: 400px;
+        width: 100%;
+    }
+    .loading-icon {
+        font-size: 4.5rem;
+        margin-bottom: 1.5rem;
+        animation: bounce 1.2s ease-in-out infinite;
+    }
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-16px); }
+    }
+    .progress-bar-wrap {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: .85rem;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        border-radius: 10px;
+        transition: width .3s ease-out;
+    }
+    .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(99, 102, 241, .3);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin .7s linear infinite;
+        vertical-align: middle;
+        margin-left: .5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .main-content {
+        opacity: 0;
+        transition: opacity .5s ease-in-out;
+    }
+    .main-content.visible {
+        opacity: 1;
+    }
+
+    /* System Engine Global Drops Override jQuery UI */
+    .ui-autocomplete {
+        background: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: var(--radius) !important;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, .6) !important;
+        max-height: 280px;
+        overflow-y: auto;
+        padding: .5rem 0 !important;
+        font-family: inherit;
+    }
+    .ui-menu-item-wrapper {
+        padding: .8rem 1.25rem !important;
+        color: #e2e8f0 !important;
+        cursor: pointer;
+        font-size: 0.95rem;
+        transition: background 0.15s ease;
+    }
+    .ui-menu-item-wrapper:hover, .ui-state-active {
+        background: linear-gradient(90deg, var(--primary), var(--secondary)) !important;
+        border: none !important;
+        color: #fff !important;
+        margin: 0 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="loading-icon">🎬</div>
+        <h2 style="font-size:1.6rem; font-weight:700; margin-bottom:.5rem; letter-spacing: -0.02em;">Loading Movie Database</h2>
+        <p style="color:var(--text-muted); margin-bottom:1.75rem; font-size: 0.95rem;">Preparing your recommendations...</p>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+        <p style="font-size:.9rem; color:var(--text-muted); font-weight: 600;"><span id="progressText">0%</span><span class="spinner"></span></p>
+    </div>
+</div>
+
+<div class="background-animation"></div>
+
+<div class="main-content" id="mainContent">
+    <div class="page-header">
+        <h1>Movie Recommendation System</h1>
+        <p class="subtitle">Discover your next favorite movie powered by AI</p>
+        <div class="stats-pill">
+            <span class="stats-dot"></span>
+            <span>{{ total_movies|default:"2,000" }}+ movies available</span>
+        </div>
+    </div>
+
+    <div class="page" style="max-width:780px; padding-top:1rem; margin: 0 auto;">
+        <div class="search-card">
+            <label for="movie_name" class="search-input-label">🎬 Search for a movie</label>
+            <form method="POST" id="searchForm">
+                {% csrf_token %}
+                <input type="text" id="movie_name" name="movie_name" class="search-input"
+                    placeholder="Start typing a movie name..."
+                    value="{{ input_movie_name|default:'' }}"
+                    required autocomplete="off">
+                <button type="submit" class="search-btn" id="searchButton">Get Recommendations</button>
+            </form>
+            <div style="text-align:center; margin-top:1rem">
+                <a href="{% url 'recommender:surprise_me' %}" class="surprise-link">🎲 Can't decide? Surprise me</a>
+            </div>
+            {% if error_message %}
+            <div class="alert">⚠ {{ error_message }}</div>
+            {% endif %}
+        </div>
+
+        {% if because_title and because_recs %}
+        <div style="margin-top:2.5rem">
+            <div class="row-container-meta">
+                <p>
+                    Because you watched <a href="{% url 'recommender:movie_detail' because_title %}" style="color:var(--primary); text-decoration:none; font-weight:700">{{ because_title }}</a>
+                </p>
+                <a href="{% url 'recommender:trending' %}">See all →</a>
+            </div>
+            <div class="movie-scroller">
+                {% for m in because_recs %}
+                <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-card-link">
+                    <div class="movie-poster-wrap">
+                        {% if m.poster_url %}
+                        <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
+                        {% else %}
+                        <div class="movie-poster-placeholder">🎬</div>
+                        {% endif %}
+                        <div class="rating-overlay-badge">★ {{ m.rating }}</div>
+                    </div>
+                    <div class="movie-card-title" title="{{ m.title }}">{{ m.title }}</div>
+                    <div class="movie-card-meta" title="{{ m.genres }}">{{ m.genres }}</div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if trending_movies %}
+        <div style="margin-top:2.5rem">
+            <div class="row-container-meta">
+                <p class="section-title-active">🔥 Trending right now</p>
+                <a href="{% url 'recommender:trending' %}">See all →</a>
+            </div>
+            <div class="movie-scroller">
+                {% for m in trending_movies %}
+                <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-card-link">
+                    <div class="movie-poster-wrap">
+                        {% if m.poster_url %}
+                        <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
+                        {% else %}
+                        <div class="movie-poster-placeholder">🎬</div>
+                        {% endif %}
+                        <div class="rating-overlay-badge">★ {{ m.rating }}</div>
+                    </div>
+                    <div class="movie-card-title" title="{{ m.title }}">{{ m.title }}</div>
+                    <div class="movie-card-meta" title="{% if m.genres %}{{ m.genres }}{% endif %}">{{ m.year }}{% if m.genres %} · {{ m.genres }}{% endif %}</div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3 class="feature-title">AI-Powered</h3>
+                <p class="feature-desc">Advanced TF-IDF + SVD similarity engine</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Lightning Fast</h3>
+                <p class="feature-desc">Recommendations in milliseconds</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">{% if user.is_authenticated %}👤{% else %}🔐{% endif %}</div>
+                <h3 class="feature-title">{% if user.is_authenticated %}Your Account{% else %}Free Account{% endif %}</h3>
+                <p class="feature-desc">{% if user.is_authenticated %}Watchlist &amp; ratings synced{% else %}Save watchlists &amp; rate movies{% endif %}</p>
+            </div>
+            <div class="feature-card" style="cursor:pointer" onclick="window.location='{% url 'recommender:mood_recommendations' %}'">
+                <div class="feature-icon">🎭</div>
+                <h3 class="feature-title">Mood Picks</h3>
+                <p class="feature-desc">Find movies that match how you feel right now</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let loadingInterval, checkCount = 0;
+function checkModelStatus() {
+    fetch('/api/model-status/')
+        .then(r => r.json())
+        .then(data => {
+            checkCount++;
+            const bar = document.getElementById('progressBar');
+            const txt = document.getElementById('progressText');
+            if (data.loaded) {
+                bar.style.width = '100%'; txt.textContent = '100%';
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                    document.getElementById('mainContent').classList.add('visible');
+                    clearInterval(loadingInterval);
+                }, 400);
+            } else if (data.status === 'error') {
+                txt.textContent = 'Error: ' + (data.error || 'Failed to load');
+                clearInterval(loadingInterval);
+            } else {
+                bar.style.width = data.progress + '%';
+                txt.textContent = data.progress + '%';
+                if (data.progress > 0 && checkCount > 5) {
+                    clearInterval(loadingInterval);
+                    loadingInterval = setInterval(checkModelStatus, 200);
+                }
+            }
+        })
+        .catch(() => {
+            if (++checkCount > 20) {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                document.getElementById('mainContent').classList.add('visible');
+                clearInterval(loadingInterval);
+            }
+        });
+}
+checkModelStatus();
+loadingInterval = setInterval(checkModelStatus, 300);
+</script>
+<script>
+$(function() {
+    var movieNames = [{% for movie in all_movie_names %}"{{ movie|escapejs }}",{% endfor %}];
+    $("#movie_name").autocomplete({source: movieNames, minLength: 2, delay: 300});
+    $('#searchForm').on('submit', function() {
+        $('#searchButton').prop('disabled', true).text('Searching...');
+    });
+    $('#movie_name').focus();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,340 @@
+{% extends 'recommender/base.html' %}
+{% block title %}{% if selected_genre %}{{ selected_genre|capfirst }} Movies{% else %}Browse by Genre{% endif %} | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* ── Genre pills ── */
+    .genre-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        margin-bottom: 1.75rem;
+    }
+    .genre-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .4rem 1rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-size: .85rem;
+        font-weight: 500;
+        border: 1.5px solid var(--surface-light);
+        color: var(--text-muted);
+        transition: var(--transition);
+        white-space: nowrap;
+    }
+    .genre-pill:hover { border-color: var(--primary); color: var(--primary); }
+    .genre-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .genre-count {
+        background: rgba(255,255,255,.12);
+        border-radius: 50px;
+        padding: .05rem .45rem;
+        font-size: .74rem;
+    }
+    .genre-pill.active .genre-count { background: rgba(255,255,255,.25); }
+
+    /* ── Filter toolbar ── */
+    .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        padding: 1rem 1.25rem;
+        background: var(--surface);
+        border-radius: var(--radius);
+        border: 1px solid rgba(255,255,255,.06);
+    }
+    .toolbar-search {
+        flex: 1;
+        min-width: 180px;
+        padding: .55rem .9rem;
+        background: var(--bg);
+        border: 1.5px solid var(--surface-light);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: .9rem;
+        transition: var(--transition);
+    }
+    .toolbar-search:focus { outline: none; border-color: var(--primary); }
+    .toolbar-search::placeholder { color: var(--text-muted); opacity: .7; }
+    .toolbar-select {
+        padding: .55rem .9rem;
+        background: var(--bg);
+        border: 1.5px solid var(--surface-light);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: .85rem;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    .toolbar-select:focus { outline: none; border-color: var(--primary); }
+    .toolbar-label { font-size: .82rem; color: var(--text-muted); white-space: nowrap; }
+    .results-meta { font-size: .88rem; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+
+    /* ── Movie grid ── */
+    .movies-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+        gap: 1rem;
+    }
+    .movie-tile {
+        background: var(--surface);
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.07);
+        transition: var(--transition);
+        text-decoration: none;
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+    }
+    .movie-tile:hover {
+        transform: translateY(-5px);
+        border-color: rgba(99,102,241,.45);
+        box-shadow: 0 12px 32px rgba(99,102,241,.18);
+    }
+    .tile-poster {
+        width: 100%;
+        aspect-ratio: 2/3;
+        background: var(--surface-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .tile-poster img { width: 100%; height: 100%; object-fit: cover; }
+    .tile-body { padding: .8rem; flex: 1; display: flex; flex-direction: column; gap: .25rem; }
+    .tile-title { font-size: .88rem; font-weight: 600; line-height: 1.35; }
+    .tile-rating { font-size: .8rem; color: #fbbf24; }
+    .tile-year { font-size: .76rem; color: var(--text-muted); }
+    .tile-overview {
+        font-size: .75rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+        margin-top: .25rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* ── Pagination ── */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: .4rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+    }
+    .page-btn {
+        padding: .45rem .8rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: .88rem;
+        font-weight: 500;
+        border: 1.5px solid var(--surface-light);
+        color: var(--text-muted);
+        transition: var(--transition);
+        min-width: 36px;
+        text-align: center;
+        display: inline-block;
+    }
+    .page-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .page-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .page-btn.disabled { opacity: .35; pointer-events: none; }
+    .page-ellipsis { color: var(--text-muted); padding: 0 .25rem; }
+
+    .empty { text-align: center; padding: 3.5rem 1rem; color: var(--text-muted); }
+    .empty-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+
+    /* Skeleton */
+    .skeleton-tile{background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid rgba(255,255,255,.07)}
+    .skeleton-poster{width:100%;aspect-ratio:2/3;background:linear-gradient(90deg,var(--surface) 25%,var(--surface-light) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+    .skeleton-body{padding:.8rem}
+    .skeleton-line{height:11px;border-radius:4px;margin-bottom:.45rem;background:linear-gradient(90deg,var(--surface) 25%,var(--surface-light) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+    .skeleton-line.short{width:50%}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    #skeletonGrid{display:none}
+
+    @media (max-width: 640px) {
+        .toolbar { flex-direction: column; align-items: stretch; }
+        .results-meta { margin-left: 0; }
+        .movies-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+
+    <div style="margin-bottom:1.25rem">
+        <h1 style="font-size:1.75rem;font-weight:700">🎭 Browse by Genre</h1>
+        <p style="color:var(--text-muted);font-size:.9rem;margin-top:.3rem">Filter, sort and search across every genre.</p>
+    </div>
+
+    <!-- Genre pills — genres is a list of (name, count) tuples -->
+    <div class="genre-bar">
+        <a href="{% url 'recommender:genre_browse' %}"
+           class="genre-pill {% if not selected_genre %}active{% endif %}">
+            All genres
+        </a>
+        {% for genre_name, genre_count in genres %}
+        <a href="?genre={{ genre_name|lower }}"
+           class="genre-pill {% if selected_genre == genre_name|lower %}active{% endif %}">
+            {{ genre_name|capfirst }}
+            <span class="genre-count">{{ genre_count }}</span>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if selected_genre %}
+
+    <!-- Filter toolbar -->
+    <form method="get" id="filterForm">
+        <input type="hidden" name="genre" value="{{ selected_genre }}">
+        <div class="toolbar">
+            <input
+                type="text"
+                name="q"
+                value="{{ query }}"
+                placeholder="Search within {{ selected_genre|capfirst }}…"
+                class="toolbar-search"
+                oninput="debounceSubmit()"
+            >
+
+            <span class="toolbar-label">Sort by</span>
+            <select name="sort" class="toolbar-select" onchange="this.form.submit()">
+                <option value="rating"     {% if sort == 'rating'     %}selected{% endif %}>⭐ Rating</option>
+                <option value="popularity" {% if sort == 'popularity' %}selected{% endif %}>📈 Popularity</option>
+                <option value="year_desc"  {% if sort == 'year_desc'  %}selected{% endif %}>📅 Newest first</option>
+                <option value="year_asc"   {% if sort == 'year_asc'   %}selected{% endif %}>📅 Oldest first</option>
+            </select>
+
+            {% if decades %}
+            <span class="toolbar-label">Decade</span>
+            <select name="decade" class="toolbar-select" onchange="this.form.submit()">
+                <option value="">All decades</option>
+                {% for d in decades %}
+                <option value="{{ d }}" {% if decade == d|stringformat:"s" %}selected{% endif %}>{{ d }}s</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            {% if languages %}
+            <span class="toolbar-label">Language</span>
+            <select name="language" class="toolbar-select" onchange="this.form.submit()">
+                <option value="">All languages</option>
+                {% for code, name, count in languages %}
+                <option value="{{ code }}" {% if language == code %}selected{% endif %}>{{ name }} ({{ count }})</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            <span class="results-meta">{{ total_count }} movie{{ total_count|pluralize }}</span>
+        </div>
+    </form>
+
+    {% if movies %}
+    <div class="movies-grid" id="moviesGrid">
+        {% for m in movies %}
+        <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-tile">
+            <div class="tile-poster">
+                {% if m.poster_url %}
+                <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
+                {% else %}
+                🎬
+                {% endif %}
+            </div>
+            <div class="tile-body">
+                <div class="tile-title">{{ m.title }}</div>
+                <div class="tile-rating">
+                    ★ {{ m.rating }}
+                    <span style="color:var(--text-muted);font-weight:400">({{ m.votes }})</span>
+                </div>
+                {% if m.year %}
+                <div class="tile-year">{{ m.year }}{% if m.language %} · {{ m.language }}{% endif %} · {{ m.genres }}</div>
+                {% endif %}
+                {% if m.overview_short %}
+                <div class="tile-overview">{{ m.overview_short }}</div>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <nav class="pagination" aria-label="Page navigation">
+        {% if page > 1 %}
+        <a href="?genre={{ selected_genre }}&sort={{ sort }}&decade={{ decade }}&language={{ language }}&q={{ query }}&page={{ page|add:'-1' }}" class="page-btn">‹ Prev</a>
+        {% else %}
+        <span class="page-btn disabled">‹ Prev</span>
+        {% endif %}
+
+        {% for p in page_range %}
+            {% if p is None %}
+            <span class="page-ellipsis">…</span>
+            {% elif p == page %}
+            <span class="page-btn active">{{ p }}</span>
+            {% else %}
+            <a href="?genre={{ selected_genre }}&sort={{ sort }}&decade={{ decade }}&language={{ language }}&q={{ query }}&page={{ p }}" class="page-btn">{{ p }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <a href="?genre={{ selected_genre }}&sort={{ sort }}&decade={{ decade }}&language={{ language }}&q={{ query }}&page={{ page|add:'1' }}" class="page-btn">Next ›</a>
+        {% else %}
+        <span class="page-btn disabled">Next ›</span>
+        {% endif %}
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">🔍</div>
+        <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:.5rem">No movies found</h2>
+        <p>Try adjusting the filters or search term.</p>
+        <a href="?genre={{ selected_genre }}" class="btn btn-outline" style="margin-top:1rem;display:inline-flex">Clear all filters</a>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty" style="padding:2.5rem 1rem">
+        <div class="empty-icon">🎭</div>
+        <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:.5rem">Pick a genre above</h2>
+        <p>Select any genre to start browsing with filters.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let _debounceTimer;
+function debounceSubmit() {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(() => document.getElementById('filterForm').submit(), 450);
+}
+
+// Show skeleton grid when form submits (navigating to new filter)
+document.querySelectorAll('select.toolbar-select').forEach(sel => {
+    sel.addEventListener('change', showSkeleton);
+});
+document.querySelectorAll('.genre-pill').forEach(a => {
+    a.addEventListener('click', showSkeleton);
+});
+function showSkeleton() {
+    const grid = document.getElementById('moviesGrid');
+    const skeleton = document.getElementById('skeletonGrid');
+    if (grid) grid.style.opacity = '.3';
+    if (skeleton) { skeleton.style.display = 'grid'; }
+}
+</script>
+{% endblock %}

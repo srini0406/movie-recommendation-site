@@ -1,0 +1,42 @@
+{% extends 'recommender/base.html' %}
+{% block title %}My Ratings | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div style="margin-bottom:1.5rem">
+        <h1 style="font-size:1.75rem;font-weight:700">My Ratings</h1>
+        <p style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">{{ ratings.count }} movie{% if ratings.count != 1 %}s{% endif %} rated</p>
+    </div>
+
+    {% if ratings %}
+    <div style="display:flex;flex-direction:column;gap:1rem">
+        {% for r in ratings %}
+        <div class="card" style="display:flex;align-items:flex-start;gap:1.25rem;flex-wrap:wrap">
+            <div style="width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:700;flex-shrink:0">
+                {{ r.score }}
+            </div>
+            <div style="flex:1;min-width:0">
+                <h3 style="font-size:1rem;font-weight:600">{{ r.movie_title }}</h3>
+                <div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem">
+                    <span style="color:var(--text-muted);font-size:.85rem">{{ r.updated_at|date:"M d, Y" }}</span>
+                </div>
+                {% if r.review %}
+                <p style="margin-top:.6rem;font-size:.9rem;color:var(--text-muted);font-style:italic">"{{ r.review }}"</p>
+                {% endif %}
+            </div>
+            <div style="display:flex;gap:.5rem">
+                <a href="https://www.google.com/search?q={{ r.movie_title|urlencode }}+movie" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Search</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">⭐</div>
+        <h2 style="font-size:1.25rem;font-weight:600;margin-bottom:.5rem">No ratings yet</h2>
+        <p>Rate movies from the recommendations page to track your opinions.</p>
+        <a href="{% url 'recommender:main' %}" class="btn btn-primary" style="margin-top:1.5rem">Find movies to rate</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

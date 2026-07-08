@@ -1,0 +1,208 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Reviews: {{ movie_title }} | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    .review-card{background:var(--surface);border-radius:var(--radius);padding:1.5rem;border:1px solid rgba(255,255,255,.07);margin-bottom:1rem}
+    .review-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap}
+    .reviewer-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+    .reviewer-name{font-weight:600;font-size:.95rem;text-decoration:none;color:var(--text)}
+    .reviewer-name:hover{color:var(--primary)}
+    .review-score{padding:.2rem .6rem;border-radius:50px;background:rgba(251,191,36,.15);color:#fbbf24;font-size:.82rem;font-weight:700}
+    .review-date{color:var(--text-muted);font-size:.8rem;margin-left:auto}
+    .review-body{font-size:.95rem;line-height:1.75;color:var(--text-muted)}
+    .review-actions{display:flex;align-items:center;gap:.75rem;margin-top:1rem;flex-wrap:wrap}
+    .like-btn{display:inline-flex;align-items:center;gap:.35rem;background:transparent;border:1.5px solid var(--surface-light);color:var(--text-muted);border-radius:8px;padding:.35rem .8rem;font-size:.85rem;cursor:pointer;font-family:inherit;transition:var(--transition)}
+    .like-btn:hover,.like-btn.liked{border-color:#ef4444;color:#fca5a5}
+    .comment-toggle{background:transparent;border:none;color:var(--primary);font-size:.85rem;cursor:pointer;font-family:inherit;text-decoration:underline}
+    .comments-section{margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.06)}
+    .comment-item{display:flex;gap:.6rem;margin-bottom:.75rem;align-items:flex-start}
+    .comment-avatar{width:28px;height:28px;border-radius:50%;background:var(--surface-light);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
+    .comment-body{background:var(--bg);border-radius:8px;padding:.5rem .85rem;flex:1;font-size:.875rem;color:var(--text-muted)}
+    .comment-meta{font-size:.75rem;color:var(--text-muted);margin-bottom:.2rem}
+    .write-review{background:var(--surface);border-radius:var(--radius);padding:1.75rem;border:1px solid rgba(255,255,255,.07);margin-bottom:1.5rem}
+    .stars-input{display:flex;gap:.3rem;margin-bottom:.75rem}
+    .star-i{font-size:1.5rem;cursor:pointer;opacity:.35;transition:opacity .15s,transform .15s}
+    .star-i.on,.star-i:hover{opacity:1;transform:scale(1.15)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem">
+        <div>
+            <h1 style="font-size:1.6rem;font-weight:700">Reviews</h1>
+            <p style="color:var(--text-muted);font-size:.9rem;margin-top:.2rem">
+                <a href="{% url 'recommender:movie_detail' movie_title %}" style="color:var(--primary);text-decoration:none">{{ movie_title }}</a>
+                · {{ reviews.count }} review{{ reviews.count|pluralize }}
+            </p>
+        </div>
+        <a href="{% url 'recommender:movie_detail' movie_title %}" class="btn btn-outline btn-sm" style="margin-left:auto">← Back to movie</a>
+    </div>
+
+    {% if user.is_authenticated %}
+    <!-- Write / Edit review -->
+    <div class="write-review">
+        <h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">
+            {% if user_review %}Edit your review{% else %}Write a review{% endif %}
+        </h2>
+        <form method="post">
+            {% csrf_token %}
+            <div style="margin-bottom:.75rem">
+                <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.4rem">Score (optional)</p>
+                <div class="stars-input" id="starsInput">
+                    {% for i in "12345678910" %}
+                    <span class="star-i {% if user_review and user_review.score and forloop.counter <= user_review.score %}on{% endif %}"
+                          data-val="{{ forloop.counter }}">★</span>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="score" id="scoreInput" value="{{ user_review.score|default:'' }}">
+            </div>
+            <textarea name="body" class="form-input" rows="4"
+                placeholder="Share your thoughts about this movie…"
+                required maxlength="2000">{{ user_review.body|default:'' }}</textarea>
+            <div style="display:flex;gap:.75rem;margin-top:.75rem;flex-wrap:wrap">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    {% if user_review %}Update review{% else %}Post review{% endif %}
+                </button>
+                {% if user_review %}
+                <form method="post" action="{% url 'recommender:delete_review' user_review.id %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete your review?')">Delete</button>
+                </form>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    {% else %}
+    <div style="background:var(--surface);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.5rem;text-align:center;color:var(--text-muted);font-size:.9rem;border:1px solid rgba(255,255,255,.06)">
+        <a href="{% url 'recommender:login' %}" style="color:var(--primary);font-weight:600;text-decoration:none">Log in</a> to write a review.
+    </div>
+    {% endif %}
+
+    <!-- Reviews list -->
+    {% if reviews %}
+    {% for review in reviews %}
+    <div class="review-card" id="review-{{ review.id }}">
+        <div class="review-header">
+            <div class="reviewer-avatar">{{ review.user.username|first|upper }}</div>
+            <a href="{% url 'recommender:public_profile' review.user.username %}" class="reviewer-name">{{ review.user.username }}</a>
+            {% if review.score %}<span class="review-score">★ {{ review.score }}/10</span>{% endif %}
+            <span class="review-date">{{ review.created_at|date:"M d, Y" }}</span>
+        </div>
+        <p class="review-body">{{ review.body }}</p>
+        <div class="review-actions">
+            <button class="like-btn {% if user in review.likes.all %}liked{% endif %}"
+                    id="like-btn-{{ review.id }}"
+                    onclick="toggleLike({{ review.id }}, this)"
+                    {% if not user.is_authenticated %}disabled title="Log in to like"{% endif %}>
+                ❤ <span id="like-count-{{ review.id }}">{{ review.like_count }}</span>
+            </button>
+            <button class="comment-toggle" onclick="toggleComments({{ review.id }})">
+                💬 {{ review.comments.count }} comment{{ review.comments.count|pluralize }}
+            </button>
+        </div>
+
+        <!-- Comments -->
+        <div class="comments-section" id="comments-{{ review.id }}" style="display:none">
+            <div id="comment-list-{{ review.id }}">
+                {% for comment in review.comments.all %}
+                <div class="comment-item" id="comment-{{ comment.id }}">
+                    <div class="comment-avatar">{{ comment.user.username|first|upper }}</div>
+                    <div class="comment-body">
+                        <div class="comment-meta">
+                            <strong>{{ comment.user.username }}</strong> · {{ comment.created_at|date:"M d, Y" }}
+                            {% if user == comment.user %}
+                            <button onclick="deleteComment({{ comment.id }})" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:.75rem;margin-left:.5rem">✕ delete</button>
+                            {% endif %}
+                        </div>
+                        {{ comment.body }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if user.is_authenticated %}
+            <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                <input type="text" id="comment-input-{{ review.id }}" class="form-input" style="padding:.5rem .75rem;font-size:.875rem" placeholder="Add a comment…" maxlength="500">
+                <button class="btn btn-primary btn-sm" onclick="postComment({{ review.id }})">Post</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">💬</div>
+        <p>No reviews yet. Be the first!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+// Star input
+const starEls = document.querySelectorAll('.star-i');
+const scoreInput = document.getElementById('scoreInput');
+if (starEls.length) {
+    let current = parseInt(scoreInput?.value) || 0;
+    function paintStars(n) { starEls.forEach(s => s.classList.toggle('on', +s.dataset.val <= n)); }
+    paintStars(current);
+    starEls.forEach(s => {
+        s.addEventListener('mouseover', () => paintStars(+s.dataset.val));
+        s.addEventListener('mouseout', () => paintStars(current));
+        s.addEventListener('click', () => { current = +s.dataset.val; scoreInput.value = current; paintStars(current); });
+    });
+}
+
+function toggleLike(id, btn) {
+    fetch(`/reviews/like/${id}/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById(`like-count-${id}`).textContent = d.count;
+            btn.classList.toggle('liked', d.liked);
+        });
+}
+
+function toggleComments(id) {
+    const el = document.getElementById(`comments-${id}`);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function postComment(reviewId) {
+    const input = document.getElementById(`comment-input-${reviewId}`);
+    const body = input.value.trim();
+    if (!body) return;
+    fetch(`/reviews/comment/${reviewId}/`, {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':CSRF},
+        body: 'body=' + encodeURIComponent(body)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) return;
+        const list = document.getElementById(`comment-list-${reviewId}`);
+        list.insertAdjacentHTML('beforeend', `
+            <div class="comment-item" id="comment-${d.id}">
+                <div class="comment-avatar">${d.user[0].toUpperCase()}</div>
+                <div class="comment-body">
+                    <div class="comment-meta"><strong>${d.user}</strong> · ${d.created_at}
+                        <button onclick="deleteComment(${d.id})" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:.75rem;margin-left:.5rem">✕ delete</button>
+                    </div>
+                    ${d.body}
+                </div>
+            </div>`);
+        input.value = '';
+    });
+}
+
+function deleteComment(id) {
+    if (!confirm('Delete comment?')) return;
+    fetch(`/reviews/comment/delete/${id}/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+        .then(r => r.json())
+        .then(d => { if (d.deleted) document.getElementById(`comment-${id}`)?.remove(); });
+}
+</script>
+{% endblock %}

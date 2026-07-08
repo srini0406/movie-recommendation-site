@@ -1,0 +1,45 @@
+{% extends 'recommender/base.html' %}
+{% block title %}My Lists | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
+        <div>
+            <h1 style="font-size:1.75rem;font-weight:700">My Lists</h1>
+            <p style="color:var(--text-muted);font-size:.9rem;margin-top:.25rem">{{ lists.count }} list{{ lists.count|pluralize }}</p>
+        </div>
+        <a href="{% url 'recommender:create_list' %}" class="btn btn-primary btn-sm">+ New List</a>
+    </div>
+
+    {% if lists %}
+    <div style="display:flex;flex-direction:column;gap:.85rem">
+        {% for ml in lists %}
+        <div class="card" style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap">
+            <div style="flex:1;min-width:0">
+                <a href="{% url 'recommender:list_detail' ml.slug %}" style="font-size:1rem;font-weight:700;color:var(--text);text-decoration:none;transition:var(--transition)" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text)'">{{ ml.title }}</a>
+                {% if ml.description %}<p style="color:var(--text-muted);font-size:.875rem;margin-top:.2rem">{{ ml.description|truncatechars:100 }}</p>{% endif %}
+                <p style="font-size:.8rem;color:var(--text-muted);margin-top:.35rem">
+                    {{ ml.item_count }} film{{ ml.item_count|pluralize }}
+                    · {% if ml.is_public %}<span style="color:#6ee7b7">Public</span>{% else %}<span style="color:var(--text-muted)">Private</span>{% endif %}
+                    · Updated {{ ml.updated_at|date:"M d, Y" }}
+                </p>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-shrink:0">
+                <a href="{% url 'recommender:list_detail' ml.slug %}" class="btn btn-outline btn-sm">View</a>
+                <form method="post" action="{% url 'recommender:delete_list' ml.slug %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this list?')">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">📋</div>
+        <p>You haven't created any lists yet.</p>
+        <a href="{% url 'recommender:create_list' %}" class="btn btn-primary" style="margin-top:1.25rem">Create your first list</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

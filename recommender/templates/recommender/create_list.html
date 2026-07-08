@@ -1,0 +1,29 @@
+{% extends 'recommender/base.html' %}
+{% block title %}Create List | MovieRec{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:560px">
+    <div class="card" style="margin-top:1.5rem">
+        <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:1.5rem">📋 Create a Movie List</h1>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">List name</label>
+                <input type="text" name="title" class="form-input" placeholder="e.g. Weekend Watches" maxlength="150" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-input" placeholder="What's this list about?" maxlength="500" rows="3"></textarea>
+            </div>
+            <div class="form-group" style="display:flex;align-items:center;gap:.75rem">
+                <input type="checkbox" name="is_public" id="is_public" checked style="width:16px;height:16px;accent-color:var(--primary)">
+                <label for="is_public" style="font-size:.9rem;cursor:pointer">Make this list public</label>
+            </div>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem">
+                <button type="submit" class="btn btn-primary">Create list</button>
+                <a href="{% url 'recommender:lists_browse' %}" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

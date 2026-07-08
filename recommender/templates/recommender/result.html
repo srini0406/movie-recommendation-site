@@ -1,0 +1,272 @@
+{% extends 'recommender/base.html' %}
+{% load static %}
+
+{% block title %}Recommendations for {{ input_movie_name }} | MovieRec{% endblock %}
+
+{% block extra_head %}
+<style>
+    .background-animation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;opacity:.05}
+    .background-animation::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,var(--primary) 1px,transparent 1px);background-size:50px 50px;animation:bgMove 20s linear infinite}
+    @keyframes bgMove{0%{transform:translate(0,0)}100%{transform:translate(50px,50px)}}
+
+    .results-header{text-align:center;padding:2.5rem 1rem 1rem;animation:fadeDown .6s ease-out}
+    .results-title{font-size:clamp(1.4rem,4vw,2.25rem);font-weight:700}
+    .searched-movie{color:var(--primary);background:rgba(99,102,241,.1);padding:.2rem .6rem;border-radius:8px}
+    .results-sub{color:var(--text-muted);font-size:1rem;margin-top:.4rem}
+
+    .movies-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1.25rem}
+
+    .movie-card{background:var(--surface);border-radius:var(--radius);border:1px solid rgba(255,255,255,.07);transition:var(--transition);position:relative;overflow:hidden;opacity:0;transform:translateY(24px);display:flex;gap:1rem}
+    .movie-card.animate-in{opacity:1;transform:translateY(0);transition:opacity .4s ease-out,transform .4s ease-out}
+    .movie-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--secondary));transform:scaleX(0);transform-origin:left;transition:var(--transition)}
+    .movie-card:hover{transform:translateY(-5px);border-color:rgba(99,102,241,.4);box-shadow:0 14px 40px rgba(99,102,241,.15)}
+    .movie-card:hover::after{transform:scaleX(1)}
+
+    /* Poster inside card */
+    .card-poster{width:90px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--surface-light);align-self:stretch;min-height:130px;display:flex;align-items:center;justify-content:center;font-size:2rem}
+    .card-poster img{width:100%;height:100%;object-fit:cover;display:block}
+    .card-body{flex:1;min-width:0;padding:1.25rem 1.25rem 1.25rem 0}
+
+    .movie-rank{position:absolute;top:.7rem;right:.7rem;width:30px;height:30px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;color:#fff}
+    .movie-title{font-size:1rem;font-weight:600;margin-bottom:.75rem;line-height:1.4;padding-right:36px}
+    .movie-meta{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.9rem}
+    .movie-meta-row{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--text-muted)}
+    .meta-icon{width:16px;text-align:center;flex-shrink:0}
+
+    .movie-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+    .action-link{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.55rem 1rem;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:500;transition:var(--transition);cursor:pointer;border:none;font-family:inherit}
+    .action-primary{background:var(--primary);color:#fff}
+    .action-primary:hover{background:var(--primary-dark);transform:translateY(-1px)}
+    .action-outline{background:transparent;border:1.5px solid var(--surface-light);color:var(--text-muted)}
+    .action-outline:hover{border-color:var(--primary);color:var(--primary)}
+    .action-saved{background:rgba(16,185,129,.15);border:1.5px solid var(--success);color:#6ee7b7}
+    .action-justwatch{background:rgba(255,197,0,.12);border:1.5px solid rgba(255,197,0,.3);color:#ffd700}
+    .action-justwatch:hover{background:rgba(255,197,0,.22);border-color:#ffd700}
+
+    /* Share bar */
+    .share-bar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:var(--surface);border:1px solid rgba(255,255,255,.07);border-radius:var(--radius);padding:.85rem 1.1rem;margin-bottom:1.25rem}
+    .share-url-text{flex:1;min-width:0;font-size:.82rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:monospace;background:var(--bg);padding:.4rem .7rem;border-radius:6px}
+
+    /* Rating modal */
+    .rating-modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center}
+    .rating-modal-backdrop.open{display:flex}
+    .rating-modal{background:var(--surface);border-radius:var(--radius);padding:2rem;max-width:420px;width:90%;border:1px solid rgba(255,255,255,.1)}
+    .modal-stars{display:flex;gap:.5rem;margin:1rem 0;justify-content:center}
+    .modal-star{font-size:2rem;cursor:pointer;transition:transform .15s;opacity:.4}
+    .modal-star.active,.modal-star:hover{opacity:1;transform:scale(1.15)}
+
+    @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+
+    @media(max-width:640px){
+        .movies-grid{grid-template-columns:1fr}
+        .movie-card{padding:1.25rem}
+        .movie-actions{flex-direction:column}
+        .action-link{width:100%}
+        .share-bar{flex-direction:column;align-items:stretch}
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="background-animation"></div>
+
+<!-- Rating modal -->
+<div class="rating-modal-backdrop" id="ratingModal">
+    <div class="rating-modal">
+        <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:.25rem" id="ratingModalTitle"></h3>
+        <p style="color:var(--text-muted);font-size:.9rem">Rate this movie</p>
+        <div class="modal-stars" id="modalStars">
+            {% for i in "12345678910" %}
+            <span class="modal-star" data-val="{{ forloop.counter }}">★</span>
+            {% endfor %}
+        </div>
+        <p style="text-align:center;color:var(--text-muted);font-size:.9rem;margin-bottom:1rem" id="scoreLabel">Select a score</p>
+        <textarea id="ratingReview" class="form-input" placeholder="Optional review..." rows="3" style="margin-bottom:1rem"></textarea>
+        <div style="display:flex;gap:.75rem">
+            <button class="btn btn-primary" id="submitRating">Save Rating</button>
+            <button class="btn btn-outline" onclick="closeRatingModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="results-header">
+    <h1 class="results-title">Movies like <span class="searched-movie">{{ input_movie_name }}</span></h1>
+    {% if source_movie %}
+    <p class="results-sub">{{ source_movie.production }} · {{ source_movie.rating }} · {{ source_movie.genres }}</p>
+    {% endif %}
+    <p class="results-sub">{{ total_recommendations }} recommendations found</p>
+</div>
+
+<div class="page" style="padding-top:.5rem">
+
+    <!-- Share bar -->
+    {% if share_url %}
+    <div class="share-bar">
+        <span style="font-size:.82rem;color:var(--text-muted);white-space:nowrap">🔗 Share:</span>
+        <span class="share-url-text" id="shareUrlText">{{ share_url }}</span>
+        <button class="action-link action-outline" style="font-size:.8rem;padding:.4rem .8rem;white-space:nowrap" onclick="copyShareUrl()">📋 Copy</button>
+        <a href="https://twitter.com/intent/tweet?text=Check+out+movies+similar+to+{{ input_movie_name|urlencode }}&url={{ share_url|urlencode }}" target="_blank" rel="noopener" class="action-link action-outline" style="font-size:.8rem;padding:.4rem .8rem">𝕏 Tweet</a>
+        <a href="https://wa.me/?text=Movies+like+{{ input_movie_name|urlencode }}+{{ share_url|urlencode }}" target="_blank" rel="noopener" class="action-link action-outline" style="font-size:.8rem;padding:.4rem .8rem">💬 WhatsApp</a>
+    </div>
+    {% endif %}
+
+    {% if recommended_movies %}
+    <div class="movies-grid">
+        {% for movie in recommended_movies %}
+        <article class="movie-card" id="card-{{ forloop.counter }}">
+            <!-- Poster -->
+            <div class="card-poster">
+                {% if movie.poster_url %}
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
+                {% else %}
+                🎬
+                {% endif %}
+            </div>
+            <!-- Body -->
+            <div class="card-body">
+                <div class="movie-rank">{{ forloop.counter }}</div>
+                <h2 class="movie-title">
+                    <a href="{% url 'recommender:movie_detail' movie.title %}" style="color:inherit;text-decoration:none;transition:var(--transition)" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='inherit'">{{ movie.title }}</a>
+                </h2>
+                <div class="movie-meta">
+                    <div class="movie-meta-row"><span class="meta-icon">⭐</span><span>{{ movie.rating }} ({{ movie.votes }} votes)</span></div>
+                    <div class="movie-meta-row"><span class="meta-icon">📅</span><span>{{ movie.release_date }}</span></div>
+                    <div class="movie-meta-row"><span class="meta-icon">🎭</span><span>{{ movie.genres }}</span></div>
+                    <div class="movie-meta-row"><span class="meta-icon">🏢</span><span>{{ movie.production }}</span></div>
+                </div>
+                <div class="movie-actions">
+                    <a href="{{ movie.google_link }}" target="_blank" rel="noopener" class="action-link action-primary">🔍 Google</a>
+                    {% if movie.imdb_link %}
+                    <a href="{{ movie.imdb_link }}" target="_blank" rel="noopener" class="action-link action-outline">⭐ IMDb</a>
+                    {% endif %}
+                    <a href="{{ movie.justwatch_url }}" target="_blank" rel="noopener" class="action-link action-justwatch" title="Find where to stream">▶ Stream</a>
+                    {% if user.is_authenticated %}
+                    <button
+                        class="action-link {% if movie.in_watchlist %}action-saved{% else %}action-outline{% endif %} wl-btn"
+                        data-title="{{ movie.title|escapejs }}"
+                        data-imdb="{{ movie.imdb_id|default:'' }}"
+                        data-poster="{{ movie.poster_url|default:'' }}"
+                        data-genres="{{ movie.genres }}"
+                        data-rating="{{ movie.rating }}"
+                        data-in="{{ movie.in_watchlist|yesno:'1,0' }}"
+                        onclick="toggleWatchlist(this)">
+                        {% if movie.in_watchlist %}✓ Saved{% else %}+ Watchlist{% endif %}
+                    </button>
+                    <button
+                        class="action-link action-outline"
+                        data-title="{{ movie.title|escapejs }}"
+                        onclick="openRatingModal(this)">
+                        {% if movie.user_rating %}★ {{ movie.user_rating }}/10{% else %}Rate{% endif %}
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-icon">😕</div>
+        <h2>No recommendations found</h2>
+        <p>Try another movie title.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+// Card entrance animation
+const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('animate-in'); observer.unobserve(e.target); }
+    });
+}, {threshold: .08});
+document.querySelectorAll('.movie-card').forEach(c => observer.observe(c));
+
+// Watchlist toggle
+function toggleWatchlist(btn) {
+    const inList = btn.dataset.in === '1';
+    const url = inList ? '{% url "recommender:watchlist_remove" %}' : '{% url "recommender:watchlist_add" %}';
+    const body = new URLSearchParams({
+        movie_title: btn.dataset.title,
+        imdb_id: btn.dataset.imdb,
+        poster_url: btn.dataset.poster,
+        genres: btn.dataset.genres,
+        rating: btn.dataset.rating,
+    });
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':CSRF}, body})
+        .then(r => r.json())
+        .then(() => {
+            if (inList) {
+                btn.dataset.in = '0'; btn.textContent = '+ Watchlist';
+                btn.classList.remove('action-saved'); btn.classList.add('action-outline');
+            } else {
+                btn.dataset.in = '1'; btn.textContent = '✓ Saved';
+                btn.classList.remove('action-outline'); btn.classList.add('action-saved');
+            }
+        });
+}
+
+// Rating modal
+let activeRatingBtn = null, selectedScore = 0;
+const stars = document.querySelectorAll('.modal-star');
+stars.forEach(s => {
+    s.addEventListener('mouseover', () => highlightStars(+s.dataset.val));
+    s.addEventListener('mouseout', () => highlightStars(selectedScore));
+    s.addEventListener('click', () => {
+        selectedScore = +s.dataset.val;
+        highlightStars(selectedScore);
+        document.getElementById('scoreLabel').textContent = selectedScore + '/10';
+    });
+});
+function highlightStars(n) { stars.forEach(s => s.classList.toggle('active', +s.dataset.val <= n)); }
+function openRatingModal(btn) {
+    activeRatingBtn = btn;
+    selectedScore = 0;
+    document.getElementById('ratingModalTitle').textContent = btn.dataset.title;
+    document.getElementById('ratingReview').value = '';
+    document.getElementById('scoreLabel').textContent = 'Select a score';
+    highlightStars(0);
+    document.getElementById('ratingModal').classList.add('open');
+}
+function closeRatingModal() {
+    document.getElementById('ratingModal').classList.remove('open');
+    activeRatingBtn = null;
+}
+document.getElementById('ratingModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeRatingModal();
+});
+document.getElementById('submitRating').addEventListener('click', () => {
+    if (!selectedScore) { document.getElementById('scoreLabel').textContent = '⚠ Please select a score'; return; }
+    const body = new URLSearchParams({
+        movie_title: activeRatingBtn.dataset.title,
+        score: selectedScore,
+        review: document.getElementById('ratingReview').value,
+    });
+    fetch('{% url "recommender:rate_movie" %}', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':CSRF}, body})
+        .then(r => r.json())
+        .then(() => {
+            activeRatingBtn.textContent = '★ ' + selectedScore + '/10';
+            closeRatingModal();
+        });
+});
+
+// Copy share URL
+function copyShareUrl() {
+    const text = document.getElementById('shareUrlText')?.textContent?.trim();
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.style.color = '#6ee7b7';
+        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+    });
+}
+
+window.scrollTo({top: 0, behavior: 'smooth'});
+</script>
+{% endblock %}
