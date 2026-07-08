@@ -214,13 +214,6 @@ LOGGING = {
             'formatter': 'verbose',
             'stream': sys.stdout,
         },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
-            'maxBytes': 1024 * 1024 * 5,  # 5 MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
     },
     'root': {
         'handlers': ['console'],
