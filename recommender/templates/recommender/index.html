@@ -1,10 +1,25 @@
 {% extends 'recommender/base.html' %}
 {% load static %}
 
-{% block title %}Movie Recommendation System - Find Your Next Favorite Film{% endblock %}
+{% block title %}Free Movie Recommendation System — Find Similar Movies Instantly{% endblock %}
+{% block meta_description %}Find movies similar to your favorites — free AI-powered movie recommendation system. Just type a movie name and get instant personalized suggestions. No signup needed.{% endblock %}
+{% block og_title %}Free Movie Recommendation System — Find Similar Movies{% endblock %}
+{% block og_description %}Type any movie and instantly find similar movies you'll love. Free AI-powered recommendations for 26,000+ films.{% endblock %}
 
-{% block extra_head %}
-<meta name="description" content="Discover your next favorite movie with our AI-powered recommendation system.">
+{% block extra_meta %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Movie Recommendation System",
+  "description": "Free AI-powered movie recommendation system. Find similar movies instantly based on your favorites.",
+  "url": "https://movie-recommendation-site.onrender.com",
+  "applicationCategory": "EntertainmentApplication",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "featureList": ["Find similar movies", "Browse by genre", "Trending movies", "Mood-based recommendations"]
+}
+</script>
+{% endblock %}
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>

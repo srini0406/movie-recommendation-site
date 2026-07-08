@@ -1,7 +1,27 @@
 {% extends 'recommender/base.html' %}
-{% block title %}{{ movie.title }} | MovieRec{% endblock %}
+{% block title %}{{ movie.title }} — Overview, Rating & Similar Movies{% endblock %}
+{% block meta_description %}{{ movie.title }} ({{ movie.release_date|slice:":4" }}) — {{ movie.overview|truncatechars:140 }} Find similar movies free.{% endblock %}
+{% block og_title %}{{ movie.title }} — Movie Info & Recommendations{% endblock %}
+{% block og_description %}{{ movie.overview|truncatechars:160 }}{% endblock %}
+{% block canonical %}https://movie-recommendation-site.onrender.com/movie/{{ movie.title|urlencode }}/{% endblock %}
 
-{% block extra_head %}
+{% block extra_meta %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Movie",
+  "name": "{{ movie.title }}",
+  "dateCreated": "{{ movie.release_date|slice:":4" }}",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "{{ movie.rating }}",
+    "bestRating": "10",
+    "ratingCount": "{{ movie.votes }}"
+  }{% if movie.poster_url %},
+  "image": "{{ movie.poster_url }}"{% endif %}
+}
+</script>
+{% endblock %}
 <style>
     .detail-hero{display:grid;grid-template-columns:220px 1fr;gap:2.5rem;align-items:start}
     .detail-poster{width:220px;border-radius:var(--radius);overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5);flex-shrink:0}

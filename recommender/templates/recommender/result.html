@@ -1,9 +1,23 @@
 {% extends 'recommender/base.html' %}
 {% load static %}
 
-{% block title %}Recommendations for {{ input_movie_name }} | MovieRec{% endblock %}
+{% block title %}Movies Similar to {{ input_movie_name }} — Free Recommendations{% endblock %}
+{% block meta_description %}Looking for movies similar to {{ input_movie_name }}? Here are the best recommendations based on AI similarity matching — free, instant, no signup.{% endblock %}
+{% block og_title %}Movies Similar to {{ input_movie_name }}{% endblock %}
+{% block og_description %}Discover movies like {{ input_movie_name }}. Free AI-powered movie recommendations for fans of {{ input_movie_name }}.{% endblock %}
+{% block canonical %}https://movie-recommendation-site.onrender.com/share/{{ input_movie_name|urlencode }}/{% endblock %}
 
-{% block extra_head %}
+{% block extra_meta %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "Movies similar to {{ input_movie_name }}",
+  "description": "AI-powered movie recommendations similar to {{ input_movie_name }}",
+  "numberOfItems": {{ total_recommendations }}
+}
+</script>
+{% endblock %}
 <style>
     .background-animation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;opacity:.05}
     .background-animation::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,var(--primary) 1px,transparent 1px);background-size:50px 50px;animation:bgMove 20s linear infinite}
