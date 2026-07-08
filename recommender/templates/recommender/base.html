@@ -4,8 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block meta_description %}Get instant AI-powered movie recommendations. Discover similar movies based on what you love — free movie recommendation system.{% endblock %}">
+    <meta name="keywords" content="movie recommendation system, find similar movies, AI movie suggestions, what to watch next">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{% block canonical %}https://movie-recommendation-site.onrender.com{% endblock %}">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{% block og_title %}Movie Recommendation System{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Discover movies you'll love. Instant AI-powered recommendations based on your favorites.{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}https://movie-recommendation-site.onrender.com{% endblock %}">
+    {% block extra_meta %}{% endblock %}
     <link rel="shortcut icon" href="{% static 'logo.ico' %}">
-    <title>{% block title %}Movie Recommendation System{% endblock %}</title>
+    <title>{% block title %}Movie Recommendation System — Find Similar Movies{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
