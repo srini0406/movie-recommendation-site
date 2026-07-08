@@ -10,7 +10,4 @@ python manage.py collectstatic --noinput
 echo "==> Running migrations..."
 python manage.py migrate
 
-echo "==> Checking/regenerating similarity matrix..."
-python regenerate_matrix.py
-
 echo "==> Build complete."
