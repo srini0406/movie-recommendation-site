@@ -205,7 +205,12 @@ class MovieRecommender:
         logger.info(f"Loaded {self.config['n_movies']:,} movies successfully")
 
     def find_movie(self, title: str) -> Optional[str]:
-        matches = get_close_matches(title, self.title_to_idx.keys(), n=1, cutoff=0.6)
+        # High cutoff so partial matches don't shadow TMDB fallback
+        matches = get_close_matches(title, self.title_to_idx.keys(), n=1, cutoff=0.85)
+        if matches:
+            logger.info(f"find_movie: '{title}' matched local -> '{matches[0]}'")
+        else:
+            logger.info(f"find_movie: '{title}' not in local dataset, routing to TMDB")
         return matches[0] if matches else None
 
     def search_movies(self, query: str, n: int = 20) -> List[str]:
