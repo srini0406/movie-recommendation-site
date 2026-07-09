@@ -7,6 +7,7 @@ app_name = 'recommender'
 urlpatterns = [
     # Main
     path('', views.main, name='main'),
+    path('about/', views.about, name='about'),
 
     # Discovery — Phase 2
     path('movie/<str:title>/', views.movie_detail, name='movie_detail'),

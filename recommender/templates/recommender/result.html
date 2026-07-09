@@ -187,6 +187,43 @@
         <p>Try another movie title.</p>
     </div>
     {% endif %}
+
+    {% if other_lang_movies %}
+    <div style="margin-top:3rem;">
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;">
+            <h2 style="font-size:1.15rem;font-weight:600;">🌍 More from Other Languages</h2>
+            <span style="font-size:.85rem;color:var(--text-muted);">Similar movies in other languages</span>
+        </div>
+        <div class="movies-grid">
+            {% for movie in other_lang_movies %}
+            <article class="movie-card animate-in" style="opacity:.85">
+                <!-- Poster -->
+                <div style="width:80px;flex-shrink:0">
+                    {% if movie.poster_url %}
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy"
+                         style="width:80px;height:120px;object-fit:cover;border-radius:8px 0 0 8px;">
+                    {% else %}
+                    <div style="width:80px;height:120px;background:var(--surface-light);border-radius:8px 0 0 8px;display:flex;align-items:center;justify-content:center;font-size:1.75rem;">🎬</div>
+                    {% endif %}
+                </div>
+                <div style="padding:.85rem .85rem .85rem 0;flex:1;min-width:0;">
+                    <a href="{% url 'recommender:movie_detail' movie.title %}" style="text-decoration:none;color:var(--text);">
+                        <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.35rem;line-height:1.3;">{{ movie.title }}</h3>
+                    </a>
+                    <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;">
+                        ⭐ {{ movie.rating }} &nbsp;·&nbsp; {{ movie.release_date|slice:":4" }}
+                    </div>
+                    <div style="font-size:.8rem;color:var(--text-muted);">{{ movie.genres }}</div>
+                    <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+                        <a href="{% url 'recommender:main' %}?movie={{ movie.title|urlencode }}" class="btn btn-sm" style="font-size:.78rem;padding:.3rem .7rem;">Similar</a>
+                        {% if movie.imdb_link %}<a href="{{ movie.imdb_link }}" target="_blank" rel="noopener" class="btn btn-sm" style="font-size:.78rem;padding:.3rem .7rem;">IMDb</a>{% endif %}
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

@@ -1,0 +1,48 @@
+{% extends 'recommender/base.html' %}
+{% block title %}About — MovieRec{% endblock %}
+
+{% block content %}
+<div style="max-width:700px;margin:4rem auto;padding:0 1.5rem;">
+    <div style="background:var(--surface);border-radius:var(--radius);padding:2.5rem;border:1px solid rgba(255,255,255,.07);">
+        <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:1.5rem;">About MovieRec</h1>
+
+        <p style="color:var(--text-muted);line-height:1.8;margin-bottom:1.5rem;">
+            MovieRec is a free AI-powered movie recommendation system that helps you discover similar movies based on what you love.
+            It uses content-based filtering with cosine similarity across 26,000+ movies to find the best matches instantly.
+        </p>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,.07);margin:1.5rem 0;">
+
+        <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:1rem;">Developer</h2>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff;flex-shrink:0;">S</div>
+            <div>
+                <div style="font-weight:600;font-size:1rem;">Srinivasan V</div>
+                <div style="color:var(--text-muted);font-size:.9rem;">PSG College of Technology</div>
+                <a href="mailto:srinivasanv0401@gmail.com" style="color:var(--primary);font-size:.9rem;text-decoration:none;">
+                    srinivasanv0401@gmail.com
+                </a>
+            </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,.07);margin:1.5rem 0;">
+
+        <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:1rem;">Features</h2>
+        <ul style="color:var(--text-muted);line-height:2;padding-left:1.25rem;">
+            <li>AI-powered movie recommendations (26,000+ movies)</li>
+            <li>Same-language recommendations first</li>
+            <li>Browse by genre — live data from TMDB</li>
+            <li>Mood-based discovery</li>
+            <li>Trending & top-rated movies</li>
+            <li>Watchlist, ratings & reviews</li>
+            <li>Movie lists & social features</li>
+        </ul>
+
+        <div style="margin-top:2rem;text-align:center;">
+            <a href="{% url 'recommender:main' %}" style="display:inline-block;padding:.65rem 1.5rem;background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
+                Start Exploring →
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

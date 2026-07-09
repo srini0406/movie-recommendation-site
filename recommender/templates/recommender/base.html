@@ -495,7 +495,7 @@
                 <a href="{% url 'recommender:my_lists' %}" class="nav-link">📋 Lists</a>
                 <a href="{% url 'recommender:my_ratings' %}" class="nav-link">My Ratings</a>
                 <a href="{% url 'recommender:leaderboard' %}" class="nav-link">🏆 Leaderboard</a>
-                {% if user.is_staff %}<a href="{% url 'recommender:analytics_dashboard' %}" class="nav-link">📊 Analytics</a>{% endif %}
+            <a href="{% url 'recommender:about' %}" class="nav-link">About</a><a href="{% url 'recommender:analytics_dashboard' %}" class="nav-link">📊 Analytics</a>{% endif %}
             {% else %}
                 <a href="{% url 'recommender:leaderboard' %}" class="nav-link">🏆 Leaderboard</a>
             {% endif %}
@@ -531,6 +531,19 @@
 {% block content %}{% endblock %}
 
 {% block extra_scripts %}{% endblock %}
+
+<!-- Footer -->
+<footer style="margin-top:4rem;padding:2rem 1.5rem;border-top:1px solid rgba(255,255,255,.07);text-align:center;color:var(--text-muted);font-size:.875rem;">
+    <div style="max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:1.5rem;">
+        <span>🎬 MovieRec</span>
+        <span>·</span>
+        <span>Built by <strong style="color:var(--text);">Srinivasan V</strong> — PSG Tech</span>
+        <span>·</span>
+        <a href="mailto:srinivasanv0401@gmail.com" style="color:var(--primary);text-decoration:none;">srinivasanv0401@gmail.com</a>
+        <span>·</span>
+        <a href="{% url 'recommender:about' %}" style="color:var(--text-muted);text-decoration:none;">About</a>
+    </div>
+</footer>
 
 <script>
 // ── Dark / Light mode handler ──

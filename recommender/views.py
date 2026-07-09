@@ -225,19 +225,26 @@ class MovieRecommender:
         movie_idx = self.title_to_idx[matched_title]
         source_movie = self.metadata.iloc[movie_idx]
 
+        # Detect source language
+        source_lang = None
+        if 'original_language' in self.metadata.columns:
+            source_lang = source_movie.get('original_language', None)
+            if pd.isna(source_lang):
+                source_lang = None
+
         # Use pre-computed top-K neighbors (already sorted, self excluded)
-        neighbor_indices = self.topk_indices[movie_idx]   # shape (K,)
-        neighbor_scores  = self.topk_scores[movie_idx]    # shape (K,)
+        neighbor_indices = self.topk_indices[movie_idx]
+        neighbor_scores  = self.topk_scores[movie_idx]
         sim_scores = list(zip(neighbor_indices.tolist(), neighbor_scores.tolist()))
 
-        recommendations = []
+        same_lang = []
+        other_lang = []
+
         for idx, score in sim_scores:
-            if len(recommendations) >= n:
-                break
             movie = self.metadata.iloc[idx]
             if min_rating and movie['vote_average'] < min_rating:
                 continue
-            recommendations.append({
+            rec = {
                 'title': movie['title'],
                 'release_date': movie['release_date'] if pd.notna(movie['release_date']) else 'Unknown',
                 'production': movie['primary_company'] if pd.notna(movie['primary_company']) else 'Unknown',
@@ -249,7 +256,22 @@ class MovieRecommender:
                 'poster_url': f"https://image.tmdb.org/t/p/w500{movie['poster_path']}" if pd.notna(movie['poster_path']) else None,
                 'google_link': f"https://www.google.com/search?q={'+'.join(movie['title'].split())}+movie",
                 'imdb_link': f"https://www.imdb.com/title/{movie['imdb_id']}" if pd.notna(movie['imdb_id']) else None,
-            })
+            }
+            # Split by language
+            movie_lang = movie.get('original_language', None) if 'original_language' in self.metadata.columns else None
+            if source_lang and not pd.isna(movie_lang) and movie_lang == source_lang:
+                if len(same_lang) < n:
+                    same_lang.append(rec)
+            else:
+                if len(other_lang) < n:
+                    other_lang.append(rec)
+
+            if len(same_lang) >= n and len(other_lang) >= n:
+                break
+
+        # If no same-lang split (language data missing), treat all as same
+        recommendations = same_lang if same_lang else (other_lang or [])
+        other_recommendations = other_lang if same_lang else []
 
         return {
             'query_movie': matched_title,
@@ -259,6 +281,8 @@ class MovieRecommender:
                 'genres': ', '.join(list(source_movie['genres'])[:3]) if hasattr(source_movie['genres'], '__iter__') and not isinstance(source_movie['genres'], str) else 'N/A',
             },
             'recommendations': recommendations,
+            'other_lang_recommendations': other_recommendations,
+            'source_lang': source_lang,
         }
 
 
@@ -404,6 +428,8 @@ def main(request):
         'input_movie_name': result['query_movie'],
         'source_movie': result['source_movie'],
         'recommended_movies': result['recommendations'],
+        'other_lang_movies': result.get('other_lang_recommendations', []),
+        'source_lang': result.get('source_lang', ''),
         'total_recommendations': len(result['recommendations']),
         'share_url': share_url,
     })
@@ -1481,3 +1507,8 @@ def api_recommendations(request):
             for m in result['recommendations']
         ],
     })
+
+
+@require_http_methods(["GET"])
+def about(request):
+    return render(request, 'recommender/about.html')
