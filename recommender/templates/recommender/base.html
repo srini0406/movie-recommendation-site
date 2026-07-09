@@ -495,10 +495,11 @@
                 <a href="{% url 'recommender:my_lists' %}" class="nav-link">📋 Lists</a>
                 <a href="{% url 'recommender:my_ratings' %}" class="nav-link">My Ratings</a>
                 <a href="{% url 'recommender:leaderboard' %}" class="nav-link">🏆 Leaderboard</a>
-            <a href="{% url 'recommender:about' %}" class="nav-link">About</a><a href="{% url 'recommender:analytics_dashboard' %}" class="nav-link">📊 Analytics</a>{% endif %}
+                {% if user.is_staff %}<a href="{% url 'recommender:analytics_dashboard' %}" class="nav-link">📊 Analytics</a>{% endif %}
             {% else %}
                 <a href="{% url 'recommender:leaderboard' %}" class="nav-link">🏆 Leaderboard</a>
             {% endif %}
+            <a href="{% url 'recommender:about' %}" class="nav-link">About</a>
         </div>
 
         <div class="nav-user-actions">
