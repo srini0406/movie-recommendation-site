@@ -7,6 +7,7 @@ Phase 3: Social — reviews, comments, movie lists, leaderboard, public profiles
 import logging
 import os
 import threading
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 from difflib import get_close_matches
@@ -33,8 +34,95 @@ from .models import Rating, WatchlistItem, WatchHistory, UserProfile, Review, Re
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Recommender singleton (unchanged from original)
+# TMDB live fallback — used when a movie isn't in the local dataset
 # ---------------------------------------------------------------------------
+
+TMDB_API_KEY = os.environ.get('TMDB_API_KEY', '')
+TMDB_BASE    = 'https://api.themoviedb.org/3'
+
+
+def _tmdb_search_movie_id(title: str) -> Optional[int]:
+    """Search TMDB for a movie title, return its TMDB id or None."""
+    if not TMDB_API_KEY:
+        return None
+    try:
+        url = (f"{TMDB_BASE}/search/movie"
+               f"?api_key={TMDB_API_KEY}&query={urllib.request.quote(title)}&page=1")
+        with urllib.request.urlopen(url, timeout=5) as r:
+            data = json.loads(r.read())
+        results = data.get('results', [])
+        return results[0]['id'] if results else None
+    except Exception as e:
+        logger.warning(f"TMDB search failed for '{title}': {e}")
+        return None
+
+
+def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
+    """Fetch similar movies from TMDB for a given movie id."""
+    if not TMDB_API_KEY:
+        return []
+    try:
+        url = (f"{TMDB_BASE}/movie/{tmdb_id}/similar"
+               f"?api_key={TMDB_API_KEY}&language=en-US&page=1")
+        with urllib.request.urlopen(url, timeout=5) as r:
+            data = json.loads(r.read())
+        movies = []
+        for m in data.get('results', [])[:n]:
+            poster = m.get('poster_path')
+            imdb_id = None  # TMDB similar doesn't return imdb_id directly
+            title = m.get('title', '')
+            movies.append({
+                'title': title,
+                'release_date': m.get('release_date', 'Unknown') or 'Unknown',
+                'production': 'Unknown',
+                'genres': 'N/A',
+                'rating': f"{m['vote_average']:.1f}/10" if m.get('vote_average') else 'N/A',
+                'votes': f"{m.get('vote_count', 0):,}",
+                'similarity_score': f"{m.get('popularity', 0):.1f}",
+                'imdb_id': None,
+                'poster_url': f"https://image.tmdb.org/t/p/w500{poster}" if poster else None,
+                'google_link': f"https://www.google.com/search?q={'+'.join(title.split())}+movie",
+                'imdb_link': None,
+            })
+        return movies
+    except Exception as e:
+        logger.warning(f"TMDB similar failed for id {tmdb_id}: {e}")
+        return []
+
+
+def _tmdb_full_fallback(title: str, n: int = 15) -> Dict:
+    """Full TMDB fallback: search for title then fetch similar movies."""
+    tmdb_id = _tmdb_search_movie_id(title)
+    if not tmdb_id:
+        return {'error': f"Movie '{title}' not found in our database or TMDB."}
+
+    # Fetch basic movie details for the source card
+    source_info = {'production': 'Unknown', 'rating': 'N/A', 'genres': 'N/A'}
+    try:
+        url = f"{TMDB_BASE}/movie/{tmdb_id}?api_key={TMDB_API_KEY}&language=en-US"
+        with urllib.request.urlopen(url, timeout=5) as r:
+            detail = json.loads(r.read())
+        genres = ', '.join(g['name'] for g in detail.get('genres', [])[:3]) or 'N/A'
+        companies = detail.get('production_companies', [])
+        source_info = {
+            'production': companies[0]['name'] if companies else 'Unknown',
+            'rating': f"{detail['vote_average']:.1f}/10" if detail.get('vote_average') else 'N/A',
+            'genres': genres,
+        }
+    except Exception:
+        pass
+
+    recs = _tmdb_get_recommendations(tmdb_id, n)
+    if not recs:
+        return {'error': f"No similar movies found for '{title}'."}
+
+    logger.info(f"TMDB fallback used for '{title}' (id={tmdb_id}), got {len(recs)} results")
+    return {
+        'query_movie': title,
+        'source_movie': source_info,
+        'recommendations': recs,
+        'tmdb_fallback': True,
+    }
 
 _RECOMMENDER = None
 _MODEL_LOADING = False
@@ -119,6 +207,10 @@ class MovieRecommender:
     def get_recommendations(self, movie_title: str, n: int = 15, min_rating: float = None) -> Dict:
         matched_title = self.find_movie(movie_title)
         if not matched_title:
+            # Try TMDB live fallback before giving up
+            tmdb_result = _tmdb_full_fallback(movie_title, n)
+            if 'error' not in tmdb_result:
+                return tmdb_result
             return {'error': f"Movie '{movie_title}' not found", 'suggestions': self.search_movies(movie_title, 5)}
 
         movie_idx = self.title_to_idx[matched_title]
