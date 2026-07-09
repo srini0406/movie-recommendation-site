@@ -41,14 +41,20 @@ TMDB_API_KEY = os.environ.get('TMDB_API_KEY', '')
 TMDB_BASE    = 'https://api.themoviedb.org/3'
 
 
+def _tmdb_key() -> str:
+    """Read key at call time so env var set after import still works."""
+    return os.environ.get('TMDB_API_KEY', TMDB_API_KEY)
+
+
 def _tmdb_search_movie_id(title: str) -> Optional[int]:
     """Search TMDB for a movie title, return its TMDB id or None."""
-    if not TMDB_API_KEY:
+    key = _tmdb_key()
+    if not key:
         return None
     try:
         url = (f"{TMDB_BASE}/search/movie"
-               f"?api_key={TMDB_API_KEY}&query={urllib.request.quote(title)}&page=1")
-        with urllib.request.urlopen(url, timeout=5) as r:
+               f"?api_key={key}&query={urllib.request.quote(title)}&page=1")
+        with urllib.request.urlopen(url, timeout=8) as r:
             data = json.loads(r.read())
         results = data.get('results', [])
         return results[0]['id'] if results else None
@@ -59,17 +65,17 @@ def _tmdb_search_movie_id(title: str) -> Optional[int]:
 
 def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
     """Fetch similar movies from TMDB for a given movie id."""
-    if not TMDB_API_KEY:
+    key = _tmdb_key()
+    if not key:
         return []
     try:
         url = (f"{TMDB_BASE}/movie/{tmdb_id}/similar"
-               f"?api_key={TMDB_API_KEY}&language=en-US&page=1")
-        with urllib.request.urlopen(url, timeout=5) as r:
+               f"?api_key={key}&language=en-US&page=1")
+        with urllib.request.urlopen(url, timeout=8) as r:
             data = json.loads(r.read())
         movies = []
         for m in data.get('results', [])[:n]:
             poster = m.get('poster_path')
-            imdb_id = None  # TMDB similar doesn't return imdb_id directly
             title = m.get('title', '')
             movies.append({
                 'title': title,
@@ -92,15 +98,18 @@ def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
 
 def _tmdb_full_fallback(title: str, n: int = 15) -> Dict:
     """Full TMDB fallback: search for title then fetch similar movies."""
+    key = _tmdb_key()
+    if not key:
+        return {'error': 'TMDB key not configured'}
+
     tmdb_id = _tmdb_search_movie_id(title)
     if not tmdb_id:
         return {'error': f"Movie '{title}' not found in our database or TMDB."}
 
-    # Fetch basic movie details for the source card
     source_info = {'production': 'Unknown', 'rating': 'N/A', 'genres': 'N/A'}
     try:
-        url = f"{TMDB_BASE}/movie/{tmdb_id}?api_key={TMDB_API_KEY}&language=en-US"
-        with urllib.request.urlopen(url, timeout=5) as r:
+        url = f"{TMDB_BASE}/movie/{tmdb_id}?api_key={key}&language=en-US"
+        with urllib.request.urlopen(url, timeout=8) as r:
             detail = json.loads(r.read())
         genres = ', '.join(g['name'] for g in detail.get('genres', [])[:3]) or 'N/A'
         companies = detail.get('production_companies', [])
