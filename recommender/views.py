@@ -480,6 +480,76 @@ def movie_detail(request, title):
     return render(request, 'recommender/movie_detail.html', {'movie': movie})
 
 
+def _tmdb_genre_movies(genre_name: str, page: int = 1, sort_by: str = 'rating',
+                        language: str = '', decade: str = '') -> List[Dict]:
+    """Fetch movies from TMDB by genre name, returns list of movie dicts."""
+    key = _tmdb_key()
+    if not key:
+        return []
+
+    # TMDB genre name -> id mapping
+    TMDB_GENRE_IDS = {
+        'action': 28, 'adventure': 12, 'animation': 16, 'comedy': 35,
+        'crime': 80, 'documentary': 99, 'drama': 18, 'family': 10751,
+        'fantasy': 14, 'history': 36, 'horror': 27, 'music': 10402,
+        'mystery': 9648, 'romance': 10749, 'sciencefiction': 878,
+        'science fiction': 878, 'thriller': 53, 'war': 10752, 'western': 37,
+        'tv movie': 10770,
+    }
+    genre_id = TMDB_GENRE_IDS.get(genre_name.lower())
+    if not genre_id:
+        return []
+
+    sort_map = {
+        'rating': 'vote_average.desc',
+        'popularity': 'popularity.desc',
+        'year_desc': 'primary_release_date.desc',
+        'year_asc': 'primary_release_date.asc',
+    }
+    tmdb_sort = sort_map.get(sort_by, 'vote_average.desc')
+
+    params = (f"?api_key={key}&with_genres={genre_id}"
+              f"&sort_by={tmdb_sort}&vote_count.gte=50&page={page}")
+    if language:
+        params += f"&with_original_language={language}"
+    if decade:
+        try:
+            d = int(decade)
+            params += f"&primary_release_date.gte={d}-01-01&primary_release_date.lte={d+9}-12-31"
+        except ValueError:
+            pass
+
+    try:
+        url = f"{TMDB_BASE}/discover/movie{params}"
+        with urllib.request.urlopen(url, timeout=8) as r:
+            data = json.loads(r.read())
+
+        movies = []
+        for m in data.get('results', []):
+            poster = m.get('poster_path')
+            title = m.get('title', '')
+            release = m.get('release_date', '') or ''
+            year = release[:4] if release else ''
+            movies.append({
+                'title': title,
+                'rating': f"{m['vote_average']:.1f}" if m.get('vote_average') else 'N/A',
+                'votes': f"{m.get('vote_count', 0):,}",
+                'popularity': f"{m.get('popularity', 0):.0f}",
+                'release_date': release,
+                'year': year,
+                'language': m.get('original_language', '').upper(),
+                'poster_url': f"https://image.tmdb.org/t/p/w185{poster}" if poster else None,
+                'genres': '',
+                'overview_short': (m.get('overview', '')[:120] + '…') if len(m.get('overview', '')) > 120 else m.get('overview', ''),
+                'imdb_id': None,
+                'tmdb_id': m.get('id'),
+            })
+        return movies
+    except Exception as e:
+        logger.warning(f"TMDB genre browse failed for '{genre_name}': {e}")
+        return []
+
+
 @require_http_methods(["GET"])
 def genre_browse(request):
     """
@@ -551,86 +621,96 @@ def genre_browse(request):
     languages = []
 
     if selected_genre:
-        # Filter by genre
-        mask = df['genres'].apply(
-            lambda g: hasattr(g, '__iter__') and not isinstance(g, str) and selected_genre in g
+        # ── TMDB live results (primary source — always up to date) ──
+        tmdb_movies = _tmdb_genre_movies(
+            selected_genre, page=page, sort_by=sort_by,
+            language=language_filter, decade=decade_filter
         )
-        filtered = df[mask].copy()
 
-        # Build language list for this genre (top languages by count)
-        if 'original_language' in filtered.columns:
-            lang_counts = filtered['original_language'].value_counts()
+        if tmdb_movies:
+            movies = tmdb_movies
+            # TMDB returns 20 per page with up to 500 pages
+            total_count = 500 * 20  # approximate
+            total_pages = 500
+            decades = list(range(1920, 2030, 10))
             languages = [
-                (code, LANG_NAMES.get(code, code.upper()), count)
-                for code, count in lang_counts.items()
-                if pd.notna(code)
+                ('en', 'English', ''), ('ta', 'Tamil', ''), ('hi', 'Hindi', ''),
+                ('ko', 'Korean', ''), ('ja', 'Japanese', ''), ('fr', 'French', ''),
+                ('es', 'Spanish', ''), ('de', 'German', ''), ('it', 'Italian', ''),
+                ('te', 'Telugu', ''), ('ml', 'Malayalam', ''), ('zh', 'Chinese', ''),
             ]
-
-        # Language filter
-        if language_filter and 'original_language' in filtered.columns:
-            filtered = filtered[filtered['original_language'] == language_filter]
-
-        # Extract year for filtering/sorting
-        def _year(rd):
-            try:
-                return int(str(rd)[:4]) if pd.notna(rd) and str(rd)[:4].isdigit() else 0
-            except Exception:
-                return 0
-
-        filtered['_year'] = filtered['release_date'].apply(_year)
-
-        # Build available decades for this genre
-        valid_years = filtered['_year'][filtered['_year'] > 0]
-        if not valid_years.empty:
-            min_dec = (valid_years.min() // 10) * 10
-            max_dec = (valid_years.max() // 10) * 10
-            decades = list(range(min_dec, max_dec + 10, 10))
-
-        # Decade filter
-        if decade_filter:
-            try:
-                d = int(decade_filter)
-                filtered = filtered[(filtered['_year'] >= d) & (filtered['_year'] < d + 10)]
-            except ValueError:
-                pass
-
-        # Search within genre
-        if query:
-            filtered = filtered[filtered['title'].str.lower().str.contains(query, na=False)]
-
-        # Sort
-        if sort_by == 'popularity':
-            filtered = filtered.sort_values('popularity', ascending=False)
-        elif sort_by == 'year_desc':
-            filtered = filtered.sort_values('_year', ascending=False)
-        elif sort_by == 'year_asc':
-            filtered = filtered[filtered['_year'] > 0].sort_values('_year', ascending=True)
         else:
-            filtered = filtered.sort_values('vote_average', ascending=False)
+            # Fallback to local dataset if TMDB unavailable
+            mask = df['genres'].apply(
+                lambda g: hasattr(g, '__iter__') and not isinstance(g, str) and selected_genre in g
+            )
+            filtered = df[mask].copy()
 
-        total_count = len(filtered)
-        total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
-        page = min(page, total_pages)
+            if 'original_language' in filtered.columns:
+                lang_counts = filtered['original_language'].value_counts()
+                languages = [
+                    (code, LANG_NAMES.get(code, code.upper()), count)
+                    for code, count in lang_counts.items()
+                    if pd.notna(code)
+                ]
 
-        start = (page - 1) * PAGE_SIZE
-        page_slice = filtered.iloc[start:start + PAGE_SIZE]
+            if language_filter and 'original_language' in filtered.columns:
+                filtered = filtered[filtered['original_language'] == language_filter]
 
-        for _, m in page_slice.iterrows():
-            year = str(m['_year']) if m['_year'] > 0 else ''
-            lang_code = m.get('original_language', '') if 'original_language' in m.index else ''
-            movies.append({
-                'title': m['title'],
-                'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
-                'votes': f"{int(m['vote_count']):,}" if pd.notna(m['vote_count']) else '',
-                'popularity': f"{m['popularity']:.0f}" if pd.notna(m['popularity']) else '',
-                'release_date': m['release_date'] if pd.notna(m['release_date']) else '',
-                'year': year,
-                'language': LANG_NAMES.get(lang_code, lang_code.upper()) if lang_code else '',
-                'poster_url': f"https://image.tmdb.org/t/p/w185{m['poster_path']}" if pd.notna(m['poster_path']) else None,
-                'genres': ', '.join(list(m['genres'])[:3]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
-                'overview_short': (m['overview'][:120] + '…') if pd.notna(m['overview']) and len(str(m['overview'])) > 120 else (m['overview'] if pd.notna(m['overview']) else ''),
-                'imdb_id': m['imdb_id'] if pd.notna(m['imdb_id']) else None,
-            })
+            def _year(rd):
+                try:
+                    return int(str(rd)[:4]) if pd.notna(rd) and str(rd)[:4].isdigit() else 0
+                except Exception:
+                    return 0
+
+            filtered['_year'] = filtered['release_date'].apply(_year)
+            valid_years = filtered['_year'][filtered['_year'] > 0]
+            if not valid_years.empty:
+                min_dec = (valid_years.min() // 10) * 10
+                max_dec = (valid_years.max() // 10) * 10
+                decades = list(range(min_dec, max_dec + 10, 10))
+
+            if decade_filter:
+                try:
+                    d = int(decade_filter)
+                    filtered = filtered[(filtered['_year'] >= d) & (filtered['_year'] < d + 10)]
+                except ValueError:
+                    pass
+
+            if query:
+                filtered = filtered[filtered['title'].str.lower().str.contains(query, na=False)]
+
+            if sort_by == 'popularity':
+                filtered = filtered.sort_values('popularity', ascending=False)
+            elif sort_by == 'year_desc':
+                filtered = filtered.sort_values('_year', ascending=False)
+            elif sort_by == 'year_asc':
+                filtered = filtered[filtered['_year'] > 0].sort_values('_year', ascending=True)
+            else:
+                filtered = filtered.sort_values('vote_average', ascending=False)
+
+            total_count = len(filtered)
+            total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+            page = min(page, total_pages)
+            start = (page - 1) * PAGE_SIZE
+            page_slice = filtered.iloc[start:start + PAGE_SIZE]
+
+            for _, m in page_slice.iterrows():
+                year = str(m['_year']) if m['_year'] > 0 else ''
+                lang_code = m.get('original_language', '') if 'original_language' in m.index else ''
+                movies.append({
+                    'title': m['title'],
+                    'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
+                    'votes': f"{int(m['vote_count']):,}" if pd.notna(m['vote_count']) else '',
+                    'popularity': f"{m['popularity']:.0f}" if pd.notna(m['popularity']) else '',
+                    'release_date': m['release_date'] if pd.notna(m['release_date']) else '',
+                    'year': year,
+                    'language': LANG_NAMES.get(lang_code, lang_code.upper()) if lang_code else '',
+                    'poster_url': f"https://image.tmdb.org/t/p/w185{m['poster_path']}" if pd.notna(m['poster_path']) else None,
+                    'genres': ', '.join(list(m['genres'])[:3]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
+                    'overview_short': (m['overview'][:120] + '…') if pd.notna(m['overview']) and len(str(m['overview'])) > 120 else (m['overview'] if pd.notna(m['overview']) else ''),
+                    'imdb_id': m['imdb_id'] if pd.notna(m['imdb_id']) else None,
+                })
 
     page_range = _page_range(page, total_pages)
 
