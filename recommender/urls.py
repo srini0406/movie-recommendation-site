@@ -10,7 +10,7 @@ urlpatterns = [
     path('about/', views.about, name='about'),
 
     # Discovery — Phase 2
-    path('movie/<str:title>/', views.movie_detail, name='movie_detail'),
+    path('movie/<path:title>/', views.movie_detail, name='movie_detail'),
     path('genres/', views.genre_browse, name='genre_browse'),
     path('trending/', views.trending, name='trending'),
     path('surprise/', views.surprise_me, name='surprise_me'),
@@ -38,7 +38,7 @@ urlpatterns = [
     path('history/add/', views.history_add, name='history_add'),
 
     # Phase 3 — Reviews
-    path('reviews/<str:title>/', views.movie_reviews, name='movie_reviews'),
+    path('reviews/<path:title>/', views.movie_reviews, name='movie_reviews'),
     path('reviews/delete/<int:review_id>/', views.delete_review, name='delete_review'),
     path('reviews/like/<int:review_id>/', views.like_review, name='like_review'),
     path('reviews/comment/<int:review_id>/', views.add_comment, name='add_comment'),
@@ -62,7 +62,7 @@ urlpatterns = [
     path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
 
     # Phase 5 — Share & Developer API
-    path('share/<str:title>/', views.share_recommendations, name='share_recommendations'),
+    path('share/<path:title>/', views.share_recommendations, name='share_recommendations'),
 
     # API endpoints
     path('api/search/', views.search_movies, name='search_movies'),

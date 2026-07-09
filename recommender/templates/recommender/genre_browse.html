@@ -244,7 +244,7 @@
     {% if movies %}
     <div class="movies-grid" id="moviesGrid">
         {% for m in movies %}
-        <a href="{% url 'recommender:share_recommendations' m.title %}" class="movie-tile">
+        <a href="/share/{{ m.title|urlencode }}/" class="movie-tile">
             <div class="tile-poster">
                 {% if m.poster_url %}
                 <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
