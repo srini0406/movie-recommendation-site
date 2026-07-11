@@ -189,7 +189,6 @@
         <a href="?genre={{ genre_name|lower }}"
            class="genre-pill {% if selected_genre == genre_name|lower %}active{% endif %}">
             {{ genre_name|capfirst }}
-            <span class="genre-count">{{ genre_count }}</span>
         </a>
         {% endfor %}
     </div>
@@ -232,7 +231,7 @@
             <select name="language" class="toolbar-select" onchange="this.form.submit()">
                 <option value="">All languages</option>
                 {% for code, name, count in languages %}
-                <option value="{{ code }}" {% if language == code %}selected{% endif %}>{{ name }} ({{ count }})</option>
+                <option value="{{ code }}" {% if language == code %}selected{% endif %}>{{ name }}</option>
                 {% endfor %}
             </select>
             {% endif %}
@@ -244,7 +243,7 @@
     {% if movies %}
     <div class="movies-grid" id="moviesGrid">
         {% for m in movies %}
-        <a href="/share/{{ m.title|urlencode }}/" class="movie-tile">
+        <a href="{% if m.tmdb_id %}/tmdb/{{ m.tmdb_id }}/{% else %}/share/{{ m.title|urlencode }}/{% endif %}" class="movie-tile">
             <div class="tile-poster">
                 {% if m.poster_url %}
                 <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">

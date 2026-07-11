@@ -64,7 +64,7 @@ def _tmdb_search_movie_id(title: str) -> Optional[int]:
 
 
 def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
-    """Fetch similar movies from TMDB for a given movie id."""
+    """Fetch similar movies from TMDB, returns all with original_language included."""
     key = _tmdb_key()
     if not key:
         return []
@@ -74,7 +74,7 @@ def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
         with urllib.request.urlopen(url, timeout=8) as r:
             data = json.loads(r.read())
         movies = []
-        for m in data.get('results', [])[:n]:
+        for m in data.get('results', [])[:n * 2]:  # fetch more for language split
             poster = m.get('poster_path')
             title = m.get('title', '')
             movies.append({
@@ -86,9 +86,12 @@ def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
                 'votes': f"{m.get('vote_count', 0):,}",
                 'similarity_score': f"{m.get('popularity', 0):.1f}",
                 'imdb_id': None,
+                'original_language': m.get('original_language', ''),
                 'poster_url': f"https://image.tmdb.org/t/p/w500{poster}" if poster else None,
                 'google_link': f"https://www.google.com/search?q={'+'.join(title.split())}+movie",
                 'imdb_link': None,
+                'justwatch_url': f"https://www.justwatch.com/us/search?q={quote_plus(title)}",
+                'tmdb_id': m.get('id'),
             })
         return movies
     except Exception as e:
@@ -96,8 +99,64 @@ def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
         return []
 
 
+def _tmdb_movie_detail(tmdb_id: int) -> Dict:
+    """Fetch full movie detail from TMDB including watch providers."""
+    key = _tmdb_key()
+    if not key:
+        return {}
+    try:
+        # Movie detail + watch providers in one append_to_response call
+        url = (f"{TMDB_BASE}/movie/{tmdb_id}"
+               f"?api_key={key}&language=en-US"
+               f"&append_to_response=watch/providers")
+        with urllib.request.urlopen(url, timeout=8) as r:
+            d = json.loads(r.read())
+
+        genres = ', '.join(g['name'] for g in d.get('genres', [])[:4]) or 'N/A'
+        companies = d.get('production_companies', [])
+        poster = d.get('poster_path')
+        backdrop = d.get('backdrop_path')
+
+        # Watch providers (US region)
+        providers = []
+        wp = d.get('watch/providers', {}).get('results', {}).get('US', {})
+        for ptype in ('flatrate', 'rent', 'buy'):
+            for p in wp.get(ptype, []):
+                name = p.get('provider_name', '')
+                logo = p.get('logo_path', '')
+                if name and name not in [x['name'] for x in providers]:
+                    providers.append({
+                        'name': name,
+                        'logo': f"https://image.tmdb.org/t/p/w45{logo}" if logo else None,
+                        'type': ptype,
+                    })
+
+        return {
+            'tmdb_id': tmdb_id,
+            'title': d.get('title', ''),
+            'tagline': d.get('tagline', ''),
+            'overview': d.get('overview', ''),
+            'release_date': d.get('release_date', ''),
+            'runtime': d.get('runtime'),
+            'genres': genres,
+            'rating': f"{d['vote_average']:.1f}" if d.get('vote_average') else 'N/A',
+            'votes': f"{d.get('vote_count', 0):,}",
+            'original_language': d.get('original_language', ''),
+            'production': companies[0]['name'] if companies else 'Unknown',
+            'poster_url': f"https://image.tmdb.org/t/p/w500{poster}" if poster else None,
+            'backdrop_url': f"https://image.tmdb.org/t/p/w1280{backdrop}" if backdrop else None,
+            'imdb_id': d.get('imdb_id'),
+            'imdb_link': f"https://www.imdb.com/title/{d['imdb_id']}" if d.get('imdb_id') else None,
+            'justwatch_url': f"https://www.justwatch.com/us/search?q={quote_plus(d.get('title',''))}",
+            'providers': providers,
+        }
+    except Exception as e:
+        logger.warning(f"TMDB detail failed for id {tmdb_id}: {e}")
+        return {}
+
+
 def _tmdb_full_fallback(title: str, n: int = 15) -> Dict:
-    """Full TMDB fallback: search for title then fetch similar movies."""
+    """Full TMDB fallback: search for title then fetch similar movies split by language."""
     key = _tmdb_key()
     if not key:
         return {'error': 'TMDB key not configured'}
@@ -106,30 +165,28 @@ def _tmdb_full_fallback(title: str, n: int = 15) -> Dict:
     if not tmdb_id:
         return {'error': f"Movie '{title}' not found in our database or TMDB."}
 
-    source_info = {'production': 'Unknown', 'rating': 'N/A', 'genres': 'N/A'}
-    try:
-        url = f"{TMDB_BASE}/movie/{tmdb_id}?api_key={key}&language=en-US"
-        with urllib.request.urlopen(url, timeout=8) as r:
-            detail = json.loads(r.read())
-        genres = ', '.join(g['name'] for g in detail.get('genres', [])[:3]) or 'N/A'
-        companies = detail.get('production_companies', [])
-        source_info = {
-            'production': companies[0]['name'] if companies else 'Unknown',
-            'rating': f"{detail['vote_average']:.1f}/10" if detail.get('vote_average') else 'N/A',
-            'genres': genres,
-        }
-    except Exception:
-        pass
+    detail = _tmdb_movie_detail(tmdb_id)
+    source_lang = detail.get('original_language', '')
+    source_info = {
+        'production': detail.get('production', 'Unknown'),
+        'rating': f"{detail.get('rating', 'N/A')}/10" if detail.get('rating') not in ('N/A', '') else 'N/A',
+        'genres': detail.get('genres', 'N/A'),
+    }
 
-    recs = _tmdb_get_recommendations(tmdb_id, n)
-    if not recs:
+    all_recs = _tmdb_get_recommendations(tmdb_id, n)
+    same_lang = [r for r in all_recs if r.get('original_language') == source_lang][:n]
+    other_lang = [r for r in all_recs if r.get('original_language') != source_lang][:n]
+
+    if not same_lang and not other_lang:
         return {'error': f"No similar movies found for '{title}'."}
 
-    logger.info(f"TMDB fallback used for '{title}' (id={tmdb_id}), got {len(recs)} results")
+    logger.info(f"TMDB fallback for '{title}' (id={tmdb_id}): {len(same_lang)} same-lang, {len(other_lang)} other-lang")
     return {
         'query_movie': title,
         'source_movie': source_info,
-        'recommendations': recs,
+        'movie_detail': detail,
+        'recommendations': same_lang if same_lang else other_lang,
+        'other_lang_recommendations': other_lang if same_lang else [],
         'tmdb_fallback': True,
     }
 
@@ -1464,10 +1521,35 @@ def share_recommendations(request, title):
         'all_movie_names': list(recommender.title_to_idx.keys()),
         'input_movie_name': result['query_movie'],
         'source_movie': result['source_movie'],
+        'movie_detail': result.get('movie_detail'),
         'recommended_movies': result['recommendations'],
+        'other_lang_movies': result.get('other_lang_recommendations', []),
         'total_recommendations': len(result['recommendations']),
         'share_url': share_url,
         'is_shared': True,
+    })
+
+
+@require_http_methods(["GET"])
+def tmdb_movie_detail(request, tmdb_id):
+    """Full movie detail page using TMDB API — poster, overview, watch providers, similar movies."""
+    key = _tmdb_key()
+    if not key:
+        return redirect('recommender:main')
+
+    detail = _tmdb_movie_detail(int(tmdb_id))
+    if not detail:
+        return redirect('recommender:main')
+
+    source_lang = detail.get('original_language', '')
+    all_recs = _tmdb_get_recommendations(int(tmdb_id), n=15)
+    same_lang = [r for r in all_recs if r.get('original_language') == source_lang][:15]
+    other_lang = [r for r in all_recs if r.get('original_language') != source_lang][:15]
+
+    return render(request, 'recommender/tmdb_movie_detail.html', {
+        'movie': detail,
+        'same_lang_movies': same_lang,
+        'other_lang_movies': other_lang,
     })
 
 

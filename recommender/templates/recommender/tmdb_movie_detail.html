@@ -1,0 +1,137 @@
+{% extends 'recommender/base.html' %}
+{% block title %}{{ movie.title }} — Movie Details{% endblock %}
+{% block meta_description %}{{ movie.overview|truncatechars:150 }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .hero{position:relative;border-radius:var(--radius);overflow:hidden;margin-bottom:2rem}
+    .hero-backdrop{width:100%;height:300px;object-fit:cover;display:block;opacity:.35}
+    .hero-content{display:flex;gap:2rem;align-items:flex-start;padding:1.5rem}
+    .hero-poster{width:180px;flex-shrink:0;border-radius:10px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5);margin-top:-80px;position:relative;z-index:1}
+    .hero-poster img{width:100%;display:block}
+    .poster-placeholder{width:180px;height:270px;background:var(--surface-light);display:flex;align-items:center;justify-content:center;font-size:4rem;border-radius:10px;margin-top:-80px;position:relative;z-index:1}
+    .hero-info{flex:1;min-width:0}
+    .movie-title{font-size:clamp(1.5rem,4vw,2.25rem);font-weight:700;line-height:1.2;margin-bottom:.4rem}
+    .tagline{color:var(--primary);font-style:italic;margin-bottom:.75rem;font-size:.95rem}
+    .meta-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
+    .chip{padding:.3rem .8rem;background:var(--surface-light);border-radius:50px;font-size:.82rem;color:var(--text-muted)}
+    .overview{color:var(--text-muted);line-height:1.75;font-size:.95rem;margin-bottom:1.25rem}
+    .actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.25rem}
+    .btn-action{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:8px;text-decoration:none;font-size:.88rem;font-weight:500;transition:all .2s}
+    .btn-primary{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff}
+    .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+    .btn-outline{border:1.5px solid var(--surface-light);color:var(--text-muted);background:transparent}
+    .btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+    .providers{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1.5rem}
+    .provider-logo{width:36px;height:36px;border-radius:8px;object-fit:cover}
+    .section-title{font-size:1.1rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+    .movies-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:2.5rem}
+    .movie-tile{background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid rgba(255,255,255,.07);transition:all .2s;text-decoration:none;color:var(--text);display:flex;flex-direction:column}
+    .movie-tile:hover{transform:translateY(-4px);border-color:rgba(99,102,241,.4);box-shadow:0 10px 28px rgba(99,102,241,.15)}
+    .tile-poster{width:100%;aspect-ratio:2/3;background:var(--surface-light);display:flex;align-items:center;justify-content:center;font-size:2.5rem;overflow:hidden}
+    .tile-poster img{width:100%;height:100%;object-fit:cover}
+    .tile-body{padding:.7rem;flex:1}
+    .tile-title{font-size:.85rem;font-weight:600;line-height:1.3;margin-bottom:.3rem}
+    .tile-meta{font-size:.75rem;color:var(--text-muted)}
+    @media(max-width:640px){
+        .hero-content{flex-direction:column}
+        .hero-poster,.poster-placeholder{margin-top:-60px;width:140px}
+        .hero-backdrop{height:200px}
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page" style="padding-top:1.5rem">
+
+    <!-- Hero -->
+    <div class="hero" style="background:var(--surface);border:1px solid rgba(255,255,255,.07)">
+        {% if movie.backdrop_url %}
+        <img src="{{ movie.backdrop_url }}" alt="{{ movie.title }}" class="hero-backdrop">
+        {% else %}
+        <div style="height:200px;background:linear-gradient(135deg,var(--surface),var(--surface-light))"></div>
+        {% endif %}
+        <div class="hero-content">
+            {% if movie.poster_url %}
+            <div class="hero-poster"><img src="{{ movie.poster_url }}" alt="{{ movie.title }}"></div>
+            {% else %}
+            <div class="poster-placeholder">🎬</div>
+            {% endif %}
+            <div class="hero-info">
+                <h1 class="movie-title">{{ movie.title }}</h1>
+                {% if movie.tagline %}<p class="tagline">"{{ movie.tagline }}"</p>{% endif %}
+                <div class="meta-chips">
+                    {% if movie.release_date %}<span class="chip">📅 {{ movie.release_date|slice:":4" }}</span>{% endif %}
+                    {% if movie.runtime %}<span class="chip">⏱ {{ movie.runtime }} min</span>{% endif %}
+                    <span class="chip">⭐ {{ movie.rating }}/10</span>
+                    <span class="chip">🗳 {{ movie.votes }} votes</span>
+                    {% if movie.genres %}<span class="chip">🎭 {{ movie.genres }}</span>{% endif %}
+                    {% if movie.production %}<span class="chip">🏢 {{ movie.production }}</span>{% endif %}
+                </div>
+                {% if movie.overview %}<p class="overview">{{ movie.overview }}</p>{% endif %}
+
+                {% if movie.providers %}
+                <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.5rem">Where to watch:</p>
+                <div class="providers">
+                    {% for p in movie.providers %}
+                    {% if p.logo %}
+                    <img src="{{ p.logo }}" alt="{{ p.name }}" class="provider-logo" title="{{ p.name }} ({{ p.type }})">
+                    {% else %}
+                    <span class="chip">{{ p.name }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="actions">
+                    {% if movie.imdb_link %}
+                    <a href="{{ movie.imdb_link }}" target="_blank" rel="noopener" class="btn-action btn-outline">⭐ IMDb</a>
+                    {% endif %}
+                    <a href="{{ movie.justwatch_url }}" target="_blank" rel="noopener" class="btn-action btn-outline">▶ JustWatch</a>
+                    <a href="https://www.google.com/search?q={{ movie.title|urlencode }}+movie" target="_blank" rel="noopener" class="btn-action btn-outline">🔍 Google</a>
+                    <a href="{% url 'recommender:genre_browse' %}" class="btn-action btn-outline">← Back to Genres</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Same language similar movies -->
+    {% if same_lang_movies %}
+    <h2 class="section-title">🎬 Similar Movies</h2>
+    <div class="movies-grid">
+        {% for m in same_lang_movies %}
+        <a href="/tmdb/{{ m.tmdb_id }}/" class="movie-tile">
+            <div class="tile-poster">
+                {% if m.poster_url %}<img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
+                {% else %}🎬{% endif %}
+            </div>
+            <div class="tile-body">
+                <div class="tile-title">{{ m.title }}</div>
+                <div class="tile-meta">⭐ {{ m.rating }} · {{ m.release_date|slice:":4" }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Other language movies -->
+    {% if other_lang_movies %}
+    <h2 class="section-title">🌍 More from Other Languages</h2>
+    <div class="movies-grid">
+        {% for m in other_lang_movies %}
+        <a href="/tmdb/{{ m.tmdb_id }}/" class="movie-tile" style="opacity:.85">
+            <div class="tile-poster">
+                {% if m.poster_url %}<img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
+                {% else %}🎬{% endif %}
+            </div>
+            <div class="tile-body">
+                <div class="tile-title">{{ m.title }}</div>
+                <div class="tile-meta">⭐ {{ m.rating }} · {{ m.release_date|slice:":4" }} · {{ m.original_language|upper }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -63,6 +63,7 @@ urlpatterns = [
 
     # Phase 5 — Share & Developer API
     path('share/<path:title>/', views.share_recommendations, name='share_recommendations'),
+    path('tmdb/<int:tmdb_id>/', views.tmdb_movie_detail, name='tmdb_movie_detail'),
 
     # API endpoints
     path('api/search/', views.search_movies, name='search_movies'),
