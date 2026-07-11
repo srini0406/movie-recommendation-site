@@ -497,7 +497,7 @@
             </div>
             <div class="movie-scroller">
                 {% for m in because_recs %}
-                <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-card-link">
+                <a href="/share/{{ m.title|urlencode }}/" class="movie-card-link">
                     <div class="movie-poster-wrap">
                         {% if m.poster_url %}
                         <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">
@@ -522,7 +522,7 @@
             </div>
             <div class="movie-scroller">
                 {% for m in trending_movies %}
-                <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-card-link">
+                <a href="{% if m.tmdb_id %}/tmdb/{{ m.tmdb_id }}/{% else %}/share/{{ m.title|urlencode }}/{% endif %}" class="movie-card-link">
                     <div class="movie-poster-wrap">
                         {% if m.poster_url %}
                         <img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">

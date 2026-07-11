@@ -45,7 +45,7 @@
     <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:1rem">{{ movies|length }} movies matched</p>
     <div class="movies-grid">
         {% for m in movies %}
-        <a href="{% url 'recommender:movie_detail' m.title %}" class="movie-tile">
+        <a href="{% if m.tmdb_id %}/tmdb/{{ m.tmdb_id }}/{% else %}/share/{{ m.title|urlencode }}/{% endif %}" class="movie-tile">
             <div class="tile-poster">
                 {% if m.poster_url %}<img src="{{ m.poster_url }}" alt="{{ m.title }}" loading="lazy">{% else %}🎬{% endif %}
             </div>

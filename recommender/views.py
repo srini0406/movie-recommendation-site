@@ -413,21 +413,40 @@ def main(request):
     if request.method == 'GET':
         because_title, because_recs = _get_because_you_watched(request.user, recommender)
 
-        # Trending fallback for guests or users with no history
+        # Trending — TMDB live, fallback to local
         trending_movies = []
         if not because_recs:
-            df = recommender.metadata
-            min_votes = df['vote_count'].quantile(0.75)
-            qualified = df[df['vote_count'] >= min_votes]
-            top = qualified.sort_values('popularity', ascending=False).head(12)
-            for _, m in top.iterrows():
-                trending_movies.append({
-                    'title': m['title'],
-                    'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
-                    'genres': ', '.join(list(m['genres'])[:2]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
-                    'year': str(m['release_date'])[:4] if pd.notna(m['release_date']) else '',
-                    'poster_url': f"https://image.tmdb.org/t/p/w185{m['poster_path']}" if pd.notna(m['poster_path']) else None,
-                })
+            tmdb_key = _tmdb_key()
+            if tmdb_key:
+                try:
+                    url = f"{TMDB_BASE}/movie/popular?api_key={tmdb_key}&language=en-US&page=1"
+                    with urllib.request.urlopen(url, timeout=6) as r:
+                        data = json.loads(r.read())
+                    for m in data.get('results', [])[:12]:
+                        poster = m.get('poster_path')
+                        trending_movies.append({
+                            'title': m.get('title', ''),
+                            'tmdb_id': m.get('id'),
+                            'rating': f"{m['vote_average']:.1f}" if m.get('vote_average') else 'N/A',
+                            'genres': '',
+                            'year': (m.get('release_date') or '')[:4],
+                            'poster_url': f"https://image.tmdb.org/t/p/w185{poster}" if poster else None,
+                        })
+                except Exception:
+                    pass
+            if not trending_movies:
+                df = recommender.metadata
+                min_votes = df['vote_count'].quantile(0.75)
+                qualified = df[df['vote_count'] >= min_votes]
+                for _, m in qualified.sort_values('popularity', ascending=False).head(12).iterrows():
+                    trending_movies.append({
+                        'title': m['title'],
+                        'tmdb_id': None,
+                        'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
+                        'genres': ', '.join(list(m['genres'])[:2]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
+                        'year': str(m['release_date'])[:4] if pd.notna(m['release_date']) else '',
+                        'poster_url': f"https://image.tmdb.org/t/p/w185{m['poster_path']}" if pd.notna(m['poster_path']) else None,
+                    })
 
         return render(request, 'recommender/index.html', {
             'all_movie_names': titles_list,
@@ -840,56 +859,94 @@ def _page_range(current, total, window=2):
 
 @require_http_methods(["GET"])
 def trending(request):
-    """Top-rated & most popular movies — popularity-based fallback for new users"""
-    recommender = _get_recommender()
-    if recommender is None:
-        return render(request, 'recommender/trending.html', {'top_rated': [], 'most_popular': []})
+    """Trending — TMDB live data (now playing, popular, top rated, upcoming)"""
+    tab = request.GET.get('tab', 'popular')
+    key = _tmdb_key()
 
-    df = recommender.metadata
+    TMDB_ENDPOINTS = {
+        'popular':    f"{TMDB_BASE}/movie/popular",
+        'top_rated':  f"{TMDB_BASE}/movie/top_rated",
+        'now_playing': f"{TMDB_BASE}/movie/now_playing",
+        'upcoming':   f"{TMDB_BASE}/movie/upcoming",
+    }
+    if tab not in TMDB_ENDPOINTS:
+        tab = 'popular'
 
-    def _serialize(row):
-        m = row[1]
-        return {
-            'title': m['title'],
-            'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
-            'votes': f"{m['vote_count']:,}" if pd.notna(m['vote_count']) else 'N/A',
-            'release_date': m['release_date'] if pd.notna(m['release_date']) else '',
-            'genres': ', '.join(list(m['genres'])[:3]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
-            'poster_url': f"https://image.tmdb.org/t/p/w185{m['poster_path']}" if pd.notna(m['poster_path']) else None,
-            'imdb_id': m['imdb_id'] if pd.notna(m['imdb_id']) else None,
-            'google_link': f"https://www.google.com/search?q={'+'.join(m['title'].split())}+movie",
-        }
+    movies = []
+    if key:
+        try:
+            # Fetch 2 pages (~40 movies)
+            for page in (1, 2):
+                url = f"{TMDB_ENDPOINTS[tab]}?api_key={key}&language=en-US&page={page}"
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    data = json.loads(r.read())
+                for m in data.get('results', []):
+                    poster = m.get('poster_path')
+                    movies.append({
+                        'title': m.get('title', ''),
+                        'tmdb_id': m.get('id'),
+                        'rating': f"{m['vote_average']:.1f}" if m.get('vote_average') else 'N/A',
+                        'votes': f"{m.get('vote_count', 0):,}",
+                        'release_date': m.get('release_date', '') or '',
+                        'poster_url': f"https://image.tmdb.org/t/p/w300{poster}" if poster else None,
+                        'overview_short': (m.get('overview', '')[:100] + '…') if len(m.get('overview', '')) > 100 else m.get('overview', ''),
+                    })
+        except Exception as e:
+            logger.warning(f"TMDB trending failed: {e}")
 
-    # Minimum vote threshold for credibility
-    min_votes = df['vote_count'].quantile(0.70)
-    qualified = df[df['vote_count'] >= min_votes]
-
-    top_rated = [_serialize(r) for r in qualified.sort_values('vote_average', ascending=False).head(96).iterrows()]
-    most_popular = [_serialize(r) for r in qualified.sort_values('popularity', ascending=False).head(96).iterrows()]
+    # Fallback to local dataset if TMDB unavailable
+    if not movies:
+        recommender = _get_recommender()
+        if recommender:
+            df = recommender.metadata
+            min_votes = df['vote_count'].quantile(0.70)
+            qualified = df[df['vote_count'] >= min_votes]
+            for _, m in qualified.sort_values('popularity', ascending=False).head(40).iterrows():
+                movies.append({
+                    'title': m['title'],
+                    'tmdb_id': None,
+                    'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
+                    'votes': f"{m['vote_count']:,}" if pd.notna(m['vote_count']) else '',
+                    'release_date': str(m['release_date']) if pd.notna(m['release_date']) else '',
+                    'poster_url': f"https://image.tmdb.org/t/p/w300{m['poster_path']}" if pd.notna(m['poster_path']) else None,
+                    'overview_short': '',
+                })
 
     return render(request, 'recommender/trending.html', {
-        'top_rated': top_rated[:24],
-        'most_popular': most_popular[:24],
-        'top_rated_json': json.dumps(top_rated),
-        'most_popular_json': json.dumps(most_popular),
+        'movies': movies,
+        'active_tab': tab,
     })
 
 
 @require_http_methods(["GET"])
 def surprise_me(request):
-    """Pick a random well-rated movie and redirect to its recommendations"""
+    """Pick a random well-rated movie from TMDB and redirect to its detail page."""
+    key = _tmdb_key()
+    if key:
+        try:
+            import random
+            page = random.randint(1, 20)
+            url = f"{TMDB_BASE}/movie/popular?api_key={key}&language=en-US&page={page}"
+            with urllib.request.urlopen(url, timeout=8) as r:
+                data = json.loads(r.read())
+            results = [m for m in data.get('results', []) if m.get('vote_average', 0) >= 6.5]
+            if results:
+                pick = random.choice(results)
+                return redirect(f"/tmdb/{pick['id']}/")
+        except Exception as e:
+            logger.warning(f"TMDB surprise failed: {e}")
+
+    # Fallback to local
     recommender = _get_recommender()
     if recommender is None:
         return redirect('recommender:main')
-
     df = recommender.metadata
     min_votes = df['vote_count'].quantile(0.60)
     pool = df[(df['vote_count'] >= min_votes) & (df['vote_average'] >= 6.5)]
     if pool.empty:
         pool = df
     pick = pool.sample(1).iloc[0]
-    title = pick['title']
-    return redirect(reverse('recommender:movie_detail', kwargs={'title': title}))
+    return redirect(reverse('recommender:share_recommendations', kwargs={'title': pick['title']}))
 
 
 @require_http_methods(["GET"])
@@ -1339,51 +1396,81 @@ def mood_recommendations(request):
 
 @require_http_methods(["GET"])
 def mood_results(request, mood_key):
-    """Movies filtered by a specific mood."""
+    """Movies filtered by a specific mood — TMDB live data primary, local fallback."""
     if mood_key not in MOOD_CONFIG:
         return redirect('recommender:mood_recommendations')
 
     mood = MOOD_CONFIG[mood_key]
-    recommender = _get_recommender()
-    if recommender is None:
-        return redirect('recommender:main')
+    key = _tmdb_key()
 
-    df = recommender.metadata
-    target_genres = set(mood['genres'])
-    keywords = mood['keywords']
-    min_rating = mood.get('min_rating', 6.0)
-
-    # Score each movie: genre overlap + keyword hits in overview
-    def _score(row):
-        g = row['genres']
-        genres_set = set(g) if hasattr(g, '__iter__') and not isinstance(g, str) else set()
-        genre_score = len(genres_set & target_genres) * 3
-
-        overview = str(row['overview']).lower() if pd.notna(row['overview']) else ''
-        keyword_score = sum(1 for kw in keywords if kw in overview)
-
-        return genre_score + keyword_score
-
-    df = df[df['vote_average'] >= min_rating].copy()
-    min_votes = df['vote_count'].quantile(0.4)
-    df = df[df['vote_count'] >= min_votes].copy()
-
-    df['_mood_score'] = df.apply(_score, axis=1)
-    results = df[df['_mood_score'] > 0].sort_values(
-        ['_mood_score', 'vote_average'], ascending=[False, False]
-    ).head(24)
+    # TMDB genre id map
+    TMDB_GENRE_IDS = {
+        'action': 28, 'adventure': 12, 'animation': 16, 'comedy': 35,
+        'crime': 80, 'documentary': 99, 'drama': 18, 'family': 10751,
+        'fantasy': 14, 'horror': 27, 'romance': 10749, 'sciencefiction': 878,
+        'thriller': 53, 'war': 10752,
+    }
 
     movies = []
-    for _, m in results.iterrows():
-        movies.append({
-            'title': m['title'],
-            'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
-            'votes': f"{int(m['vote_count']):,}" if pd.notna(m['vote_count']) else '',
-            'year': str(m['release_date'])[:4] if pd.notna(m['release_date']) else '',
-            'genres': ', '.join(list(m['genres'])[:3]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
-            'overview_short': (str(m['overview'])[:130] + '…') if pd.notna(m['overview']) and len(str(m['overview'])) > 130 else (m['overview'] if pd.notna(m['overview']) else ''),
-            'poster_url': f"https://image.tmdb.org/t/p/w185{m['poster_path']}" if pd.notna(m['poster_path']) else None,
-        })
+    if key:
+        try:
+            genre_ids = [str(TMDB_GENRE_IDS[g]) for g in mood['genres'] if g in TMDB_GENRE_IDS]
+            if genre_ids:
+                url = (f"{TMDB_BASE}/discover/movie?api_key={key}"
+                       f"&with_genres={','.join(genre_ids)}"
+                       f"&sort_by=vote_average.desc"
+                       f"&vote_count.gte=200"
+                       f"&vote_average.gte={mood.get('min_rating', 6.0)}"
+                       f"&page=1")
+                with urllib.request.urlopen(url, timeout=8) as r:
+                    data = json.loads(r.read())
+                for m in data.get('results', [])[:24]:
+                    poster = m.get('poster_path')
+                    title = m.get('title', '')
+                    overview = m.get('overview', '')
+                    movies.append({
+                        'title': title,
+                        'tmdb_id': m.get('id'),
+                        'rating': f"{m['vote_average']:.1f}" if m.get('vote_average') else 'N/A',
+                        'votes': f"{m.get('vote_count', 0):,}",
+                        'year': (m.get('release_date') or '')[:4],
+                        'genres': '',
+                        'overview_short': (overview[:130] + '…') if len(overview) > 130 else overview,
+                        'poster_url': f"https://image.tmdb.org/t/p/w300{poster}" if poster else None,
+                    })
+        except Exception as e:
+            logger.warning(f"TMDB mood failed for '{mood_key}': {e}")
+
+    # Fallback to local dataset
+    if not movies:
+        recommender = _get_recommender()
+        if recommender:
+            df = recommender.metadata
+            target_genres = set(mood['genres'])
+            keywords = mood['keywords']
+            min_rating = mood.get('min_rating', 6.0)
+
+            def _score(row):
+                g = row['genres']
+                genres_set = set(g) if hasattr(g, '__iter__') and not isinstance(g, str) else set()
+                genre_score = len(genres_set & target_genres) * 3
+                overview = str(row['overview']).lower() if pd.notna(row['overview']) else ''
+                return genre_score + sum(1 for kw in keywords if kw in overview)
+
+            df = df[df['vote_average'] >= min_rating].copy()
+            df = df[df['vote_count'] >= df['vote_count'].quantile(0.4)].copy()
+            df['_mood_score'] = df.apply(_score, axis=1)
+            for _, m in df[df['_mood_score'] > 0].sort_values(['_mood_score', 'vote_average'], ascending=[False, False]).head(24).iterrows():
+                movies.append({
+                    'title': m['title'],
+                    'tmdb_id': None,
+                    'rating': f"{m['vote_average']:.1f}" if pd.notna(m['vote_average']) else 'N/A',
+                    'votes': f"{int(m['vote_count']):,}" if pd.notna(m['vote_count']) else '',
+                    'year': str(m['release_date'])[:4] if pd.notna(m['release_date']) else '',
+                    'genres': ', '.join(list(m['genres'])[:3]) if hasattr(m['genres'], '__iter__') and not isinstance(m['genres'], str) else '',
+                    'overview_short': (str(m['overview'])[:130] + '…') if pd.notna(m['overview']) and len(str(m['overview'])) > 130 else (m['overview'] if pd.notna(m['overview']) else ''),
+                    'poster_url': f"https://image.tmdb.org/t/p/w300{m['poster_path']}" if pd.notna(m['poster_path']) else None,
+                })
 
     return render(request, 'recommender/mood_results.html', {
         'mood': mood,
