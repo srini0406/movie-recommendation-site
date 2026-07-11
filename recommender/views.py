@@ -318,22 +318,32 @@ class MovieRecommender:
                 'poster_url': f"https://image.tmdb.org/t/p/w500{movie['poster_path']}" if pd.notna(movie['poster_path']) else None,
                 'google_link': f"https://www.google.com/search?q={'+'.join(movie['title'].split())}+movie",
                 'imdb_link': f"https://www.imdb.com/title/{movie['imdb_id']}" if pd.notna(movie['imdb_id']) else None,
+                'justwatch_url': f"https://www.justwatch.com/us/search?q={quote_plus(movie['title'])}",
             }
-            # Split by language
             movie_lang = movie.get('original_language', None) if 'original_language' in self.metadata.columns else None
-            if source_lang and not pd.isna(movie_lang) and movie_lang == source_lang:
-                if len(same_lang) < n:
-                    same_lang.append(rec)
+            if source_lang and movie_lang is not None and not pd.isna(movie_lang) and movie_lang == source_lang:
+                same_lang.append(rec)
             else:
-                if len(other_lang) < n:
-                    other_lang.append(rec)
+                other_lang.append(rec)
 
-            if len(same_lang) >= n and len(other_lang) >= n:
-                break
+        # If local dataset has no same-language results, try TMDB for same-language
+        if not same_lang and source_lang:
+            logger.info(f"No same-lang local results for '{matched_title}' ({source_lang}), trying TMDB")
+            tmdb_id = _tmdb_search_movie_id(matched_title)
+            if tmdb_id:
+                tmdb_recs = _tmdb_get_recommendations(tmdb_id, n=n)
+                same_lang = [r for r in tmdb_recs if r.get('original_language') == source_lang][:n]
+                # merge other_lang with tmdb other-lang
+                tmdb_other = [r for r in tmdb_recs if r.get('original_language') != source_lang]
+                other_lang = (other_lang + tmdb_other)[:n]
 
-        # If no same-lang split (language data missing), treat all as same
-        recommendations = same_lang if same_lang else (other_lang or [])
-        other_recommendations = other_lang if same_lang else []
+        # If still no same-lang (language column missing), treat all as main
+        if not same_lang:
+            same_lang = other_lang or []
+            other_lang = []
+        else:
+            other_lang = other_lang[:n]
+            same_lang = same_lang[:n]
 
         return {
             'query_movie': matched_title,
@@ -342,8 +352,8 @@ class MovieRecommender:
                 'rating': f"{source_movie['vote_average']:.1f}/10" if pd.notna(source_movie['vote_average']) else 'N/A',
                 'genres': ', '.join(list(source_movie['genres'])[:3]) if hasattr(source_movie['genres'], '__iter__') and not isinstance(source_movie['genres'], str) else 'N/A',
             },
-            'recommendations': recommendations,
-            'other_lang_recommendations': other_recommendations,
+            'recommendations': same_lang,
+            'other_lang_recommendations': other_lang,
             'source_lang': source_lang,
         }
 
@@ -1416,28 +1426,31 @@ def mood_results(request, mood_key):
         try:
             genre_ids = [str(TMDB_GENRE_IDS[g]) for g in mood['genres'] if g in TMDB_GENRE_IDS]
             if genre_ids:
-                url = (f"{TMDB_BASE}/discover/movie?api_key={key}"
-                       f"&with_genres={','.join(genre_ids)}"
-                       f"&sort_by=vote_average.desc"
-                       f"&vote_count.gte=200"
-                       f"&vote_average.gte={mood.get('min_rating', 6.0)}"
-                       f"&page=1")
-                with urllib.request.urlopen(url, timeout=8) as r:
-                    data = json.loads(r.read())
-                for m in data.get('results', [])[:24]:
-                    poster = m.get('poster_path')
-                    title = m.get('title', '')
-                    overview = m.get('overview', '')
-                    movies.append({
-                        'title': title,
-                        'tmdb_id': m.get('id'),
-                        'rating': f"{m['vote_average']:.1f}" if m.get('vote_average') else 'N/A',
-                        'votes': f"{m.get('vote_count', 0):,}",
-                        'year': (m.get('release_date') or '')[:4],
-                        'genres': '',
-                        'overview_short': (overview[:130] + '…') if len(overview) > 130 else overview,
-                        'poster_url': f"https://image.tmdb.org/t/p/w300{poster}" if poster else None,
-                    })
+                for page in (1, 2, 3):
+                    url = (f"{TMDB_BASE}/discover/movie?api_key={key}"
+                           f"&with_genres={','.join(genre_ids)}"
+                           f"&sort_by=vote_average.desc"
+                           f"&vote_count.gte=200"
+                           f"&vote_average.gte={mood.get('min_rating', 6.0)}"
+                           f"&page={page}")
+                    with urllib.request.urlopen(url, timeout=8) as r:
+                        data = json.loads(r.read())
+                    for m in data.get('results', []):
+                        poster = m.get('poster_path')
+                        title = m.get('title', '')
+                        overview = m.get('overview', '')
+                        movies.append({
+                            'title': title,
+                            'tmdb_id': m.get('id'),
+                            'rating': f"{m['vote_average']:.1f}" if m.get('vote_average') else 'N/A',
+                            'votes': f"{m.get('vote_count', 0):,}",
+                            'year': (m.get('release_date') or '')[:4],
+                            'genres': '',
+                            'overview_short': (overview[:130] + '…') if len(overview) > 130 else overview,
+                            'poster_url': f"https://image.tmdb.org/t/p/w300{poster}" if poster else None,
+                        })
+                    if len(movies) >= 60:
+                        break
         except Exception as e:
             logger.warning(f"TMDB mood failed for '{mood_key}': {e}")
 
