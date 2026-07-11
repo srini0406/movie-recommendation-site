@@ -1542,14 +1542,21 @@ def tmdb_movie_detail(request, tmdb_id):
         return redirect('recommender:main')
 
     source_lang = detail.get('original_language', '')
-    all_recs = _tmdb_get_recommendations(int(tmdb_id), n=15)
-    same_lang = [r for r in all_recs if r.get('original_language') == source_lang][:15]
-    other_lang = [r for r in all_recs if r.get('original_language') != source_lang][:15]
+    all_recs = _tmdb_get_recommendations(int(tmdb_id), n=20)
+
+    same_lang = [r for r in all_recs if r.get('original_language') == source_lang]
+    other_lang = [r for r in all_recs if r.get('original_language') != source_lang]
+
+    # If no same-lang results, show everything as main recommendations
+    if not same_lang:
+        same_lang = all_recs[:15]
+        other_lang = []
 
     return render(request, 'recommender/tmdb_movie_detail.html', {
         'movie': detail,
-        'same_lang_movies': same_lang,
-        'other_lang_movies': other_lang,
+        'same_lang_movies': same_lang[:15],
+        'other_lang_movies': other_lang[:10],
+        'source_lang': source_lang,
     })
 
 
