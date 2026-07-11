@@ -1,81 +1,92 @@
 # 🎬 Movie Recommendation System
 
-A free AI-powered movie recommendation system built with Django. Type any movie name and instantly get similar movie suggestions based on content similarity — no signup required.
+A free AI-powered movie recommendation system built with Django. Type any movie name and instantly get similar movie suggestions — no signup required.
 
-**Live Demo:** [movie-recommendation-site.onrender.com](https://movie-recommendation-site.onrender.com)
-
----
-
-## Features
-
-- **AI Recommendations** — Content-based filtering using cosine similarity across 26,000+ movies
-- **TMDB Live Fallback** — New & Tamil movies not in the local dataset are fetched live from TMDB API
-- **Same-language first** — Recommendations prioritize the same language as the searched movie
-- **Genre Browse** — Live TMDB data, filter by language, decade, sort by rating/popularity/year
-- **Trending & Top Rated** — Popularity-ranked movies with poster cards
-- **Mood-based Discovery** — Find movies by mood (Feel-Good, Thrilling, Scary, etc.)
-- **Surprise Me** — Random well-rated movie picker
-- **User Accounts** — Register, login, profiles
-- **Watchlist** — Save movies to watch later
-- **Ratings & Reviews** — Rate movies 1–10, write reviews, like & comment
-- **Movie Lists** — Create and share public/private movie lists
-- **Leaderboard** — Top reviewers and most-reviewed movies
-- **Dark/Light Mode** — Theme toggle
-- **Fully Responsive** — Works on mobile and desktop
+**🌐 Live Demo:** [movie-recommendation-site.onrender.com](https://movie-recommendation-site.onrender.com)
 
 ---
 
-## Screenshots
+## ✨ Features
 
-> Search any movie → get instant similar movie recommendations with posters, ratings, and links.
+| Feature | Description |
+|---|---|
+| 🤖 AI Recommendations | Content-based cosine similarity across 26,000+ movies |
+| 🌐 TMDB Live Fallback | New & regional movies fetched live from TMDB API |
+| 🗣️ Same-language first | Recommends movies in the same language first |
+| 🎭 Cast/Director Match | If no same-language similar movies found, finds films by the same actors/director |
+| 🌍 Other Languages | Second section shows similar movies from other languages |
+| 🎬 Genre Browse | Live TMDB data — filter by language, decade, sort by rating/popularity/year |
+| 🔥 Trending | 4 tabs: Popular, Now Playing, Top Rated, Upcoming — live from TMDB |
+| 😊 Mood Discovery | Find movies by mood (Feel-Good, Thrilling, Scary, etc.) — ~60 movies per mood |
+| 🎲 Surprise Me | Random well-rated movie from TMDB, redirects to full detail page |
+| 🎞️ Movie Detail Page | Backdrop, poster, tagline, runtime, watch providers (Netflix, Prime, etc.) |
+| 👤 User Accounts | Register, login, profiles, edit bio |
+| 📋 Watchlist | Save movies to watch later |
+| ⭐ Ratings & Reviews | Rate 1–10, write reviews, like & comment |
+| 📝 Movie Lists | Create and share public/private movie lists |
+| 🏆 Leaderboard | Top reviewers and most-reviewed movies |
+| 🌙 Dark/Light Mode | Theme toggle persisted in localStorage |
+| 📱 Fully Responsive | Works on mobile and desktop |
 
 ---
 
-## Tech Stack
+## 🖼️ How It Works
+
+```
+User searches "Amaran"
+        ↓
+Local dataset (26,326 movies) — not found
+        ↓
+TMDB API: search by title → get movie ID
+        ↓
+TMDB /similar → filter by same language (Tamil)
+        ↓
+If empty → TMDB Credits API (cast + director)
+        → Discover movies with same cast/director in Tamil
+        ↓
+Same-language results shown first
+Other-language results shown below
+```
+
+For movies **in the local dataset** (e.g. "Inception"):
+```
+Local top-20 similarity neighbors
+        ↓
+Split by original_language
+        ↓
+Same-language section → Other-language section
+If same-lang empty → TMDB cast/director/language discovery
+```
+
+---
+
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Backend | Django 5.2 (Python 3.11) |
-| ML / Similarity | NumPy, SciPy, scikit-learn |
+| ML / Similarity | NumPy, SciPy, scikit-learn (TF-IDF + SVD + cosine similarity) |
 | Data | Pandas, PyArrow (Parquet) |
-| Live Movie Data | TMDB API |
-| Frontend | Vanilla JS, CSS (no framework) |
+| Live Movie Data | TMDB API v3 |
+| Frontend | Vanilla JS + CSS (no framework) |
 | Auth | Django built-in auth |
-| Static Files | WhiteNoise + Brotli |
-| Database | SQLite (dev) |
-| Deployment | Render |
+| Static Files | WhiteNoise + Brotli compression |
+| Database | SQLite |
+| Deployment | Render (free tier) |
 
 ---
 
-## How It Works
-
-1. **Offline phase** — A TF-IDF vectorizer + SVD model computes cosine similarity across movie metadata (genres, overview, cast, keywords). The full NxN similarity matrix (~3.5 GB) is compressed to a top-20 neighbors format (`top_k_similarities.npz`, ~3 MB).
-
-2. **At request time** — User searches a movie → local dataset lookup → if found, returns top-20 similar movies split by language → if not found, TMDB API is called live to fetch similar movies.
-
-```
-User searches "Amaran"
-  ↓
-Local dataset (26,326 movies) — not found
-  ↓
-TMDB API live search → fetch similar movies
-  ↓
-Results returned with posters, ratings, genres
-```
-
----
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 Movie-Recommendation-System/
 ├── manage.py
 ├── requirements.txt
-├── build.sh                  # Render build script
-├── convert_to_topk.py        # One-time: compress full similarity matrix to top-K
+├── build.sh                        # Render build script
+├── convert_to_topk.py              # Compress full similarity matrix → top-K
 ├── models/
-│   ├── movie_metadata.parquet
-│   ├── top_k_similarities.npz  # shape (26326, 20)
+│   ├── movie_metadata.parquet      # 26,326 movies metadata
+│   ├── top_k_similarities.npz     # Top-20 neighbors per movie (~3 MB)
 │   ├── svd_model.pkl
 │   ├── tfidf_vectorizer.pkl
 │   ├── title_to_idx.json
@@ -84,23 +95,25 @@ Movie-Recommendation-System/
 │   ├── settings.py
 │   └── urls.py
 └── recommender/
-    ├── views.py              # All views + TMDB fallback logic
-    ├── models.py             # Rating, Watchlist, Review, MovieList, etc.
+    ├── views.py                    # All views + TMDB live logic
+    ├── models.py                   # Rating, Watchlist, Review, MovieList
     ├── urls.py
+    ├── templatetags/
+    │   └── movie_filters.py        # Custom template filter (split)
     └── templates/recommender/
-        ├── base.html
-        ├── index.html
-        ├── result.html
-        ├── movie_detail.html
-        ├── genre_browse.html
-        ├── trending.html
-        ├── mood.html
+        ├── base.html               # Nav, footer, dark/light mode
+        ├── index.html              # Home page
+        ├── result.html             # Recommendation results
+        ├── tmdb_movie_detail.html  # TMDB movie detail page
+        ├── genre_browse.html       # Genre browsing with filters
+        ├── trending.html           # Trending tabs
+        ├── mood.html / mood_results.html
         └── ...
 ```
 
 ---
 
-## Local Setup
+## 🚀 Local Setup
 
 ```bash
 # Clone
@@ -115,10 +128,10 @@ venv\Scripts\activate        # Windows
 # Install dependencies
 pip install -r requirements.txt
 
-# Set environment variables (create .env file)
-echo SECRET_KEY=your-secret-key > .env
-echo DEBUG=True >> .env
-echo TMDB_API_KEY=your-tmdb-api-key >> .env
+# Create .env file
+SECRET_KEY=your-secret-key-here
+DEBUG=True
+TMDB_API_KEY=your-tmdb-api-key
 
 # Run migrations
 python manage.py migrate
@@ -129,55 +142,63 @@ python manage.py runserver
 
 Open [http://localhost:8000](http://localhost:8000)
 
-> **Note:** You need the model files (`models/` directory) to run locally. The `top_k_similarities.npz` file is included in the repo via Git LFS.
+> **Note:** Model files in the `models/` directory are required. `top_k_similarities.npz` is tracked via Git LFS.
 
 ---
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 | Variable | Description | Required |
 |---|---|---|
-| `SECRET_KEY` | Django secret key | Yes |
-| `DEBUG` | `True` for dev, `False` for prod | Yes |
-| `TMDB_API_KEY` | API key from [themoviedb.org](https://www.themoviedb.org/settings/api) | Yes (for live data) |
-| `MODEL_DIR` | Path to models directory (default: `models`) | No |
+| `SECRET_KEY` | Django secret key | ✅ |
+| `DEBUG` | `True` for dev, `False` for prod | ✅ |
+| `TMDB_API_KEY` | API key from [themoviedb.org](https://www.themoviedb.org/settings/api) | ✅ |
+| `MODEL_DIR` | Path to models directory (default: `models`) | ❌ |
 
 ---
 
-## Similarity Matrix Compression
+## 📦 Similarity Matrix Compression
 
-The original full cosine similarity matrix is ~3.5 GB. The `convert_to_topk.py` script compresses it to only store the top-20 neighbors per movie:
+The original full NxN cosine similarity matrix is ~3.5 GB. The `convert_to_topk.py` script compresses it to only store the top-20 neighbors per movie:
 
 ```bash
 python convert_to_topk.py
 ```
 
-| File | Size |
-|---|---|
-| `similarity_matrix.npz` (original) | ~3,500 MB |
-| `top_k_similarities.npz` (compressed) | ~3 MB |
-| Reduction | **99.9%** |
+| File | Size | Notes |
+|---|---|---|
+| `similarity_matrix.npz` | ~3,500 MB | Original full matrix (not in repo) |
+| `top_k_similarities.npz` | ~3 MB | Top-20 neighbors only |
+| Reduction | **99.9%** | |
 
 ---
 
-## Deployment (Render)
+## ☁️ Deploying to Render
 
 1. Push to GitHub
-2. Create a new Web Service on [render.com](https://render.com)
-3. Set build command: `chmod +x build.sh && bash build.sh`
-4. Set start command: `gunicorn movie_recommendation.wsgi:application --workers 2 --timeout 120`
-5. Add environment variables: `SECRET_KEY`, `DEBUG=False`, `TMDB_API_KEY`, `MODEL_DIR=models`
+2. New Web Service → connect repo
+3. Build command: `chmod +x build.sh && bash build.sh`
+4. Start command: `gunicorn movie_recommendation.wsgi:application --workers 2 --timeout 120`
+5. Environment variables:
+
+| Key | Value |
+|---|---|
+| `SECRET_KEY` | generate a strong random key |
+| `DEBUG` | `False` |
+| `TMDB_API_KEY` | your TMDB key |
+| `MODEL_DIR` | `models` |
+| `PYTHON_VERSION` | `3.11.0` |
 
 ---
 
-## Developer
+## 👨‍💻 Developer
 
-**Srinivasan V**  
-PSG College of Technology  
+**Srinivasan V**
+PSG College of Technology
 📧 [srinivasanv0401@gmail.com](mailto:srinivasanv0401@gmail.com)
 
 ---
 
-## License
+## 📄 License
 
-MIT License — free to use, modify, and distribute.
+MIT License — free to use, modify and distribute.
