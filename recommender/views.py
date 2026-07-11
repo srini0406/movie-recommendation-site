@@ -74,7 +74,7 @@ def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
         with urllib.request.urlopen(url, timeout=8) as r:
             data = json.loads(r.read())
         movies = []
-        for m in data.get('results', [])[:n * 2]:  # fetch more for language split
+        for m in data.get('results', [])[:n * 2]:
             poster = m.get('poster_path')
             title = m.get('title', '')
             movies.append({
@@ -97,6 +97,117 @@ def _tmdb_get_recommendations(tmdb_id: int, n: int = 15) -> List[Dict]:
     except Exception as e:
         logger.warning(f"TMDB similar failed for id {tmdb_id}: {e}")
         return []
+
+
+def _tmdb_same_language_movies(tmdb_id: int, source_lang: str, n: int = 15) -> List[Dict]:
+    """
+    Find same-language movies via cast/director credits + TMDB Discover.
+    Used when /similar returns no same-language results.
+    """
+    key = _tmdb_key()
+    if not key or not source_lang:
+        return []
+
+    # Step 1: get top cast + director
+    person_ids = []
+    try:
+        url = f"{TMDB_BASE}/movie/{tmdb_id}/credits?api_key={key}"
+        with urllib.request.urlopen(url, timeout=8) as r:
+            credits = json.loads(r.read())
+        # Top 3 cast members
+        for p in credits.get('cast', [])[:3]:
+            person_ids.append(str(p['id']))
+        # Director
+        for p in credits.get('crew', []):
+            if p.get('job') == 'Director':
+                person_ids.append(str(p['id']))
+                break
+    except Exception as e:
+        logger.warning(f"TMDB credits failed for {tmdb_id}: {e}")
+
+    if not person_ids:
+        return []
+
+    # Step 2: discover movies with those people in same language
+    movies = []
+    seen_ids = {tmdb_id}
+    try:
+        url = (f"{TMDB_BASE}/discover/movie?api_key={key}"
+               f"&with_people={','.join(person_ids[:3])}"
+               f"&with_original_language={source_lang}"
+               f"&sort_by=vote_average.desc"
+               f"&vote_count.gte=50"
+               f"&page=1")
+        with urllib.request.urlopen(url, timeout=8) as r:
+            data = json.loads(r.read())
+        for m in data.get('results', []):
+            if m.get('id') in seen_ids:
+                continue
+            seen_ids.add(m.get('id'))
+            poster = m.get('poster_path')
+            title = m.get('title', '')
+            movies.append({
+                'title': title,
+                'release_date': m.get('release_date', 'Unknown') or 'Unknown',
+                'production': 'Unknown',
+                'genres': 'N/A',
+                'rating': f"{m['vote_average']:.1f}/10" if m.get('vote_average') else 'N/A',
+                'votes': f"{m.get('vote_count', 0):,}",
+                'similarity_score': 'cast/director match',
+                'imdb_id': None,
+                'original_language': m.get('original_language', ''),
+                'poster_url': f"https://image.tmdb.org/t/p/w500{poster}" if poster else None,
+                'google_link': f"https://www.google.com/search?q={'+'.join(title.split())}+movie",
+                'imdb_link': None,
+                'justwatch_url': f"https://www.justwatch.com/us/search?q={quote_plus(title)}",
+                'tmdb_id': m.get('id'),
+            })
+    except Exception as e:
+        logger.warning(f"TMDB discover by people failed for {tmdb_id}: {e}")
+
+    # Step 3: if still not enough, just discover by language + genre
+    if len(movies) < 5:
+        try:
+            # get genre ids from the source movie
+            genre_url = f"{TMDB_BASE}/movie/{tmdb_id}?api_key={key}"
+            with urllib.request.urlopen(genre_url, timeout=8) as r:
+                detail = json.loads(r.read())
+            genre_ids = ','.join(str(g['id']) for g in detail.get('genres', [])[:2])
+            url = (f"{TMDB_BASE}/discover/movie?api_key={key}"
+                   f"&with_original_language={source_lang}"
+                   f"&sort_by=vote_average.desc"
+                   f"&vote_count.gte=100"
+                   + (f"&with_genres={genre_ids}" if genre_ids else '')
+                   + "&page=1")
+            with urllib.request.urlopen(url, timeout=8) as r:
+                data = json.loads(r.read())
+            for m in data.get('results', []):
+                if m.get('id') in seen_ids or len(movies) >= n:
+                    continue
+                seen_ids.add(m.get('id'))
+                poster = m.get('poster_path')
+                title = m.get('title', '')
+                movies.append({
+                    'title': title,
+                    'release_date': m.get('release_date', 'Unknown') or 'Unknown',
+                    'production': 'Unknown',
+                    'genres': 'N/A',
+                    'rating': f"{m['vote_average']:.1f}/10" if m.get('vote_average') else 'N/A',
+                    'votes': f"{m.get('vote_count', 0):,}",
+                    'similarity_score': 'same language & genre',
+                    'imdb_id': None,
+                    'original_language': m.get('original_language', ''),
+                    'poster_url': f"https://image.tmdb.org/t/p/w500{poster}" if poster else None,
+                    'google_link': f"https://www.google.com/search?q={'+'.join(title.split())}+movie",
+                    'imdb_link': None,
+                    'justwatch_url': f"https://www.justwatch.com/us/search?q={quote_plus(title)}",
+                    'tmdb_id': m.get('id'),
+                })
+        except Exception as e:
+            logger.warning(f"TMDB discover by language failed: {e}")
+
+    logger.info(f"_tmdb_same_language_movies: found {len(movies)} for lang={source_lang}")
+    return movies[:n]
 
 
 def _tmdb_movie_detail(tmdb_id: int) -> Dict:
@@ -176,6 +287,10 @@ def _tmdb_full_fallback(title: str, n: int = 15) -> Dict:
     all_recs = _tmdb_get_recommendations(tmdb_id, n)
     same_lang = [r for r in all_recs if r.get('original_language') == source_lang][:n]
     other_lang = [r for r in all_recs if r.get('original_language') != source_lang][:n]
+
+    # If /similar gave no same-language results, use credits + discover
+    if not same_lang and source_lang:
+        same_lang = _tmdb_same_language_movies(tmdb_id, source_lang, n=n)
 
     if not same_lang and not other_lang:
         return {'error': f"No similar movies found for '{title}'."}
@@ -326,16 +441,20 @@ class MovieRecommender:
             else:
                 other_lang.append(rec)
 
-        # If local dataset has no same-language results, try TMDB for same-language
+        # If local dataset has no same-language results, try TMDB
         if not same_lang and source_lang:
-            logger.info(f"No same-lang local results for '{matched_title}' ({source_lang}), trying TMDB")
+            logger.info(f"No same-lang local results for '{matched_title}' ({source_lang}), trying TMDB cast/director/language")
             tmdb_id = _tmdb_search_movie_id(matched_title)
             if tmdb_id:
-                tmdb_recs = _tmdb_get_recommendations(tmdb_id, n=n)
+                # First try /similar filtered by language
+                tmdb_recs = _tmdb_get_recommendations(tmdb_id, n=n * 2)
                 same_lang = [r for r in tmdb_recs if r.get('original_language') == source_lang][:n]
-                # merge other_lang with tmdb other-lang
                 tmdb_other = [r for r in tmdb_recs if r.get('original_language') != source_lang]
                 other_lang = (other_lang + tmdb_other)[:n]
+
+                # If /similar still gave no same-lang, use credits + discover
+                if not same_lang:
+                    same_lang = _tmdb_same_language_movies(tmdb_id, source_lang, n=n)
 
         # If still no same-lang (language column missing), treat all as main
         if not same_lang:
