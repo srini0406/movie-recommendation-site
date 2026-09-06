@@ -2,7 +2,7 @@
 
 A free AI-powered movie recommendation system built with Django. Type any movie name and instantly get similar movie suggestions — no signup required.
 
-**🌐 Live Demo:** [movie-recommendation-site.onrender.com](https://movie-recommendation-site.onrender.com)
+**🌐 Live Demo:** [movie-recommendation-site.onrender.com](https://movie-recommendation-site-xn4n.onrender.com/)
 
 ---
 
